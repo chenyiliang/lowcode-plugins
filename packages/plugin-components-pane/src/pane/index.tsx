@@ -45,7 +45,7 @@ export default class ComponentPane extends React.Component<ComponentPaneProps, C
 
   store = store;
 
-  t: (input: Text) => string;
+  t: (input?: Text) => string;
 
   getStrKeywords: (keywords: Text[]) => string;
 
@@ -91,7 +91,7 @@ export default class ComponentPane extends React.Component<ComponentPaneProps, C
     });
   }, 200);
 
-  constructor(props) {
+  constructor(props: ComponentPaneProps) {
     super(props);
     this.t = getTextReader(props.lang);
     this.getStrKeywords = (keywords: Text[]): string => {
@@ -119,8 +119,10 @@ export default class ComponentPane extends React.Component<ComponentPaneProps, C
     }
 
     if (isNewEngineVersion) {
-      event.on('trunk.change', this.initComponentList.bind(this));
-      material.onChangeAssets(this.initComponentList.bind(this));
+      // isNewEngineVersion 为真说明全局引擎对象存在，material/event 同源；
+      // 用可选链是为了满足严格空检查，与本文件其它 editor?.get / designer?.dragon 写法保持一致
+      event?.on('trunk.change', this.initComponentList.bind(this));
+      material?.onChangeAssets(this.initComponentList.bind(this));
     } else {
       editor.on('trunk.change', this.initComponentList.bind(this));
       editor.once('editor.ready', this.initComponentList.bind(this));
@@ -134,7 +136,7 @@ export default class ComponentPane extends React.Component<ComponentPaneProps, C
    */
   initComponentList() {
     const { editor } = this.props;
-    const rawData = isNewEngineVersion ? material.getAssets() : editor.get('assets');
+    const rawData = isNewEngineVersion ? material.getAssets() : editor?.get('assets');
 
     const meta = transform(rawData, this.t);
 
@@ -168,7 +170,7 @@ export default class ComponentPane extends React.Component<ComponentPaneProps, C
 
     const { editor } = this.props;
     const designer = !isNewEngineVersion ? editor?.get('designer') : null;
-    const _dragon = isNewEngineVersion ? common.designerCabin.dragon : designer?.dragon;
+    const _dragon = isNewEngineVersion ? common?.designerCabin?.dragon : designer?.dragon;
     if (!_dragon || (!isNewEngineVersion && !designer)) {
       return;
     }
@@ -179,7 +181,7 @@ export default class ComponentPane extends React.Component<ComponentPaneProps, C
     shell.addEventListener('click', click);
 
     _dragon.from(shell, (e: Event) => {
-      const doc = isNewEngineVersion ? project.getCurrentDocument() : designer?.currentDocument;
+      const doc = isNewEngineVersion ? project?.getCurrentDocument() : designer?.currentDocument;
       const id = getSnippetId(e.target);
       if (!doc || !id) {
         return false;

@@ -47,7 +47,7 @@ function ResourceListTree(
   const [category, setCategory] = useState<{
     [key: string]: IPublicModelResource[];
   }>({});
-  const [filterValue, setFilterValue] = useState();
+  const [filterValue, setFilterValue] = useState<string | undefined>(undefined);
   const [activeId, setActiveId] = useState(
     props.pluginContext?.workspace.window?.resource?.id + ''
   );
@@ -61,7 +61,7 @@ function ResourceListTree(
     });
     setCategory(category);
   }, [props.resourceList]);
-  const handleSearchChange = useCallback((key) => {
+  const handleSearchChange = useCallback((key: string) => {
     setFilterValue(key);
   }, []);
   workspace.onChangeActiveWindow(() => {

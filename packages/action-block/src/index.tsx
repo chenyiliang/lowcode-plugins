@@ -26,11 +26,13 @@ let dialog: any;
 const SaveAsBlock = (props: SaveAsBlockProps) => {
   const { createBlock } = checkBlockAPI();
   const { node } = props;
-  const [ src, setSrc ] = React.useState();
+  const [ src, setSrc ] = React.useState<string>();
   React.useEffect(() => {
     const generateImage = async () => {
-      let dom2 = node.getDOMNode();
-      // console.log('html2canvas: ', html2canvas);
+      const dom2 = node.getDOMNode();
+      if (!dom2) {
+        return;
+      }
       const canvas = await html2canvas?.(dom2, { scale: 0.5 });
       const dataUrl = canvas.toDataURL();
       setSrc(dataUrl);
@@ -39,8 +41,9 @@ const SaveAsBlock = (props: SaveAsBlockProps) => {
     generateImage();
   }, []);
 
-  const save = async (values) => {
-    const { name, title } = values;
+  // @alifd/next Form.Submit 的 onClick 首参为 unknown（表单值），此处收窄为具体形状
+  const save = async (value?: unknown) => {
+    const { name, title } = (value ?? {}) as { name: string; title: string };
     const { schema } = node;
 
     await createBlock({

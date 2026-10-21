@@ -1,4 +1,4 @@
-import { EditorPluginInterface, Service } from '@/Service';
+import { EditorPluginInterface, Service } from '../../Service';
 import type editor from 'monaco-editor';
 import { findEditorMatch } from './util';
 import { getAllMethodFromSchema } from './search';

@@ -1,6 +1,6 @@
 import { common, plugins, config } from '@alilc/lowcode-engine';
 import React, { useEffect, useState } from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import { createFetchHandler } from '@alilc/lowcode-datasource-fetch-handler';
 import { scenarioSwitcher } from '../../sample-plugins/scenario-switcher';
 import registerPlugins from '../../universal/plugin';
@@ -57,6 +57,8 @@ preference.set('DataSourcePane', {
       fetch: createFetchHandler(),
     },
   });
-  // @ts-ignore
-  ReactDOM.render(<EditorView />, document.getElementById('lce-container')!);
+  const container = document.getElementById('lce-container');
+  if (container) {
+    createRoot(container).render(<EditorView />);
+  }
 })();

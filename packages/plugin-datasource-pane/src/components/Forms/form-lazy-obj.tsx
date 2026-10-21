@@ -38,18 +38,18 @@ export const FormLazyObj = observer((props: FormLazyObjProps) => {
   const properties = useMemo(() => {
     return Object.keys(schema.properties || {})
       .filter((i) => selectedProperties.indexOf(i) === -1)
-      .map((propertyKey) => ({
-        label: schema.properties?.[propertyKey].title,
+      .map((propertyKey: string) => ({
+        label: (schema.properties as Record<string, { title?: string }> | undefined)?.[propertyKey]?.title,
         value: propertyKey,
       }));
   }, [schema, selectedProperties]);
 
-  const handleAdd = useCallback((propertyKey) => {
+  const handleAdd = useCallback((propertyKey: string) => {
     setSelectedProperties((selectedProperties) => selectedProperties.concat(propertyKey));
   }, []);
 
   /* 改成formily内部支持 */
-  const handleRemove = useCallback((propertyKey) => {
+  const handleRemove = useCallback((propertyKey: string) => {
     field?.form?.query(propertyKey)?.take()?.setState((state) => {
       state.visible = !state.visible;
     });
@@ -82,7 +82,7 @@ export const FormLazyObj = observer((props: FormLazyObjProps) => {
       components: { JSFunction, FormLayout, FormItem },
     });
     const schemaJSON = schema.toJSON();
-    const schemaProperties = _pick(schemaJSON.properties, selectedProperties);
+    const schemaProperties = _pick(schemaJSON.properties, selectedProperties) as Record<string, any>;
 
     return (
       <SchemaField
@@ -91,7 +91,7 @@ export const FormLazyObj = observer((props: FormLazyObjProps) => {
           type: 'void',
           'x-component': 'FormLayout',
           'x-component-props': {},
-          properties: Object.keys(schemaProperties).reduce((acc, cur) => {
+          properties: Object.keys(schemaProperties).reduce<Record<string, any>>((acc, cur) => {
             acc[cur] = {
               ...schemaProperties[cur],
               'x-decorator-props': {

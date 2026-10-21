@@ -3,7 +3,7 @@ import BaseMonacoEditor from '@alilc/lowcode-plugin-base-monaco-editor';
 import type { editor } from 'monaco-editor';
 import './index.css';
 import { Monaco } from '../../types';
-import { editorController } from '@/Controller';
+import { editorController } from '../../Controller';
 
 export interface MonacoEditorProps {
   theme?: string;

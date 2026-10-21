@@ -50,9 +50,9 @@ const plugin = (ctx: IPublicModelPluginContext, options: Options) => {
         },
       });
 
-      schemaDock && schemaDock.disable();
+      schemaDock?.disable();
       ctx.project.onSimulatorRendererReady(() => {
-        schemaDock.enable();
+        schemaDock?.enable();
       });
     },
   };

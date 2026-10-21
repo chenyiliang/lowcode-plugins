@@ -48,12 +48,27 @@ export interface ParamValueProps {
   types: ParamValueType[];
 }
 
+/**
+ * 面板中一个参数可能承载的全部取值形态。
+ *
+ * 迁移说明：原 ParamValueState['value'] 只声明了 `string | number | JSExpression | boolean`，
+ * 但 handleTypeChange 的 JSON / JSONSTRING 分支会写入对象与数组，声明与实现不一致
+ * （旧 tsconfig 未开 strict 故未暴露）。这里抽出统一的联合类型，供 state 与局部变量共用。
+ */
+type ParamValuePayload =
+  | string
+  | number
+  | boolean
+  | JSExpression
+  | any[]
+  | Record<string, any>;
+
 export interface ParamValueState {
   type: ParamValueType;
-  value: string | number | JSExpression | boolean;
+  value: ParamValuePayload;
 }
 
-function isBoolean(val: boolean | string) {
+function isBoolean(val: unknown): val is boolean | string {
   return _isBoolean(val) || val === 'true' || val === 'false';
 }
 
@@ -118,7 +133,9 @@ class ParamValueComp extends PureComponent<ParamValueProps, ParamValueState> {
     const { types } = this.props;
     const { type } = this.state;
     let nextRealType = nextType;
-    let nextValue = this.props.value || '';
+    // props.value 为 any，这里按面板实际会遇到的取值范围显式声明，
+    // 避免后续分支里出现隐式 any 以及 boolean | string 上访问 .value 的类型错误
+    let nextValue: ParamValuePayload = this.props.value || '';
     if (!nextRealType) {
       const currentTypeIndex = this.props.types.indexOf(type);
       nextRealType = types[(currentTypeIndex + 1) % types.length];
@@ -131,11 +148,16 @@ class ParamValueComp extends PureComponent<ParamValueProps, ParamValueState> {
         // nextValue = nextValue.toString();
         break;
       case ParamValueEnum.NUMBER:
-        nextValue *= 1;
+        nextValue = Number(nextValue as string | number | boolean) * 1;
         break;
       case ParamValueEnum.BOOLEAN:
         if (isBoolean(nextValue)) {
-          nextValue = nextValue === 'true' || (nextValue && nextValue.value === 'true') || false;
+          // 原实现同时兼容字符串 'true' 与表达式对象（{ value: 'true' }）两种来源，
+          // 这里用 isJSExpression 显式区分，语义与原先一致
+          nextValue =
+            nextValue === 'true' ||
+            (isJSExpression(nextValue) && nextValue.value === 'true') ||
+            false;
         }
         break;
       case ParamValueEnum.JSONSTRING:
@@ -205,7 +227,7 @@ class ParamValueComp extends PureComponent<ParamValueProps, ParamValueState> {
             value: item,
           }))}
           value={type}
-          onChange={this.handleTypeChange}
+          onChange={(nextType) => this.handleTypeChange(nextType as string)}
         />
       );
     }
@@ -271,8 +293,11 @@ class ParamValueComp extends PureComponent<ParamValueProps, ParamValueState> {
           <span className={generateClassName('universal-value-json')}>
             <EditorContext.Consumer>
               {({ setters }) => {
-                const ExpressionSetter = setters?.getSetter('ExpressionSetter').component;
-                if (!ExpressionSetter) return null;
+                // getSetter(...).component 类型为 IPublicTypeCustomView = ReactElement | ComponentType，
+                // 作为组件渲染前用 typeof === 'function' 收窄掉 ReactElement 分支
+                const raw = setters?.getSetter('ExpressionSetter')?.component;
+                if (typeof raw !== 'function') return null;
+                const ExpressionSetter = raw as React.ComponentType<any>;
                 return (
                   <ExpressionSetter
                     className={generateClassName('universal-value-expression')}

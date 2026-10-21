@@ -1,4 +1,4 @@
-import { Monaco } from '@/types';
+import { Monaco } from '../../types';
 import type { editor } from 'monaco-editor';
 export function focusCodeByContent(
   editor: editor.IStandaloneCodeEditor,

@@ -7,7 +7,8 @@ import { defaultBabelConfig, defaultCode, WORDS, TAB_KEY } from '../../config';
 import { transformJS, transformAst, stateParser, getMethods } from '../../utils';
 
 import { FunctionEventParams } from '../../types';
-import { IEditorInstance, IMonacoInstance } from '@alilc/lowcode-plugin-base-monaco-editor/lib/helper';
+import { IEditorInstance, IMonacoInstance } from '@alilc/lowcode-plugin-base-monaco-editor';
+import type { editor as monacoEditorNs, IRange } from 'monaco-editor';
 
 import './JsEditor.less';
 
@@ -43,14 +44,16 @@ export class JsEditor extends PureComponent<JsEditorProps, JsEditorState> {
   };
 
   monaco?: IMonacoInstance;
-  monacoEditor?: IEditorInstance;
-  lastErrorDecoration: any;
+  // 本组件只挂载单文件代码编辑器（SingleMonacoEditor），运行时恒为 IStandaloneCodeEditor。
+  // base-monaco 的 editorDidMount 回调签名是联合类型 IEditorInstance，故在挂载处收窄。
+  monacoEditor?: monacoEditorNs.IStandaloneCodeEditor;
+  lastErrorDecoration: string[] | null = null;
 
   disposeProvider?: { dispose: () => void };
 
   // get schema from code
   getSchemaFromCode() {
-    const code = this.monacoEditor?.getModel()?.getValue() ?? this.state.code;
+    const code = this.monacoEditor?.getModel()?.getValue() ?? this.state.code ?? '';
     const ast = transformAst(code);
     const { methods, errorsByMethods } = getMethods(ast);
     let lifeCycles: Record<string, unknown> = {};
@@ -89,7 +92,8 @@ export class JsEditor extends PureComponent<JsEditorProps, JsEditorState> {
   }
 
   async editorDidMount(monaco: IMonacoInstance, editor: IEditorInstance) {
-    this.monacoEditor = editor;
+    // 见上：SingleMonacoEditor 挂载的一定是单文件编辑器
+    this.monacoEditor = editor as monacoEditorNs.IStandaloneCodeEditor;
     this.monaco = monaco;
 
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
@@ -99,7 +103,8 @@ export class JsEditor extends PureComponent<JsEditorProps, JsEditorState> {
     });
 
     monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-      target: monaco.languages.typescript.ScriptTarget.ES6,
+      // monaco 0.45+ 移除了 ScriptTarget.ES6，ES6 == ES2015
+      target: monaco.languages.typescript.ScriptTarget.ES2015,
       allowNonTsExtensions: true,
       moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
       module: monaco.languages.typescript.ModuleKind.CommonJS,
@@ -115,13 +120,14 @@ export class JsEditor extends PureComponent<JsEditorProps, JsEditorState> {
     this.disposeProvider?.dispose?.();
     this.disposeProvider = monaco.languages.registerHoverProvider('javascript', {
       provideHover: (model: any, position: any) => {
+        const errorColumn = this.state.errorLocation?.column ?? 0;
         if (this.state.errorLocation?.line === position.lineNumber) {
           return {
             range: new monaco.Range(
               position.lineNumber,
-              this.state.errorLocation?.column,
+              errorColumn,
               position.lineNumber,
-              (this.state.errorLocation?.column ?? 0) + 1
+              errorColumn + 1
             ),
             contents: [
               { value: `**${this.state.errorInfo}**`, supportHtml: true, isTrusted: true },
@@ -157,9 +163,11 @@ export class JsEditor extends PureComponent<JsEditorProps, JsEditorState> {
 
   focusByFunctionName({ functionName }: FunctionEventParams) {
     const { monacoEditor } = this;
+    // monaco 0.34+ 的 findMatches 需要完整 6 参重载：
+    // (searchString, searchOnlyEditableRange, isRegex, matchCase, wordSeparators, captureMatches)
     const matchedResult = monacoEditor
       ?.getModel()
-      ?.findMatches(`^\\s*(?:async)?\\s*${functionName}\\s*\\([\\s\\S]*\\)[\\s\\S]*\\{`, false, true)
+      ?.findMatches(`^\\s*(?:async)?\\s*${functionName}\\s*\\([\\s\\S]*\\)[\\s\\S]*\\{`, false, true, false, null, false)
       ?.[0];
     if (matchedResult) {
       setTimeout(() => {
@@ -180,11 +188,16 @@ export class JsEditor extends PureComponent<JsEditorProps, JsEditorState> {
     }
 
     // 找到最后一个 }，在他前面插入新的 function 字符串
-    const matches = monacoEditor.getModel()?.findMatches('}');
-    let range = {}
-    if(matches && matches.length > 0) {
-      const { startLineNumber, startColumn } = matches[matches.length - 1]?.range || {}
-      range = new monaco.Range(startLineNumber, startColumn, startLineNumber, startColumn);
+    const matches = monacoEditor.getModel()?.findMatches('}', false, false, false, null, false);
+    let range: IRange | undefined;
+    if (matches && matches.length > 0) {
+      const { startLineNumber, startColumn } = matches[matches.length - 1]?.range || {};
+      if (startLineNumber && startColumn) {
+        range = new monaco.Range(startLineNumber, startColumn, startLineNumber, startColumn);
+      }
+    }
+    if (!range) {
+      return;
     }
 
     const functionCode = params.template ?
@@ -192,7 +205,7 @@ export class JsEditor extends PureComponent<JsEditorProps, JsEditorState> {
       `\n\t${params.functionName}(){\n\t}\n`;
 
     monacoEditor.executeEdits('log-source', [
-      { identifier: 'event_id', range, text: functionCode, forceMoveMarkers: true },
+      { range, text: functionCode, forceMoveMarkers: true },
     ]);
 
     params.functionName && this.focusByFunctionName(params);
@@ -277,10 +290,11 @@ export class JsEditor extends PureComponent<JsEditorProps, JsEditorState> {
               ),
               options: {
                 inlineClassName: 'squiggly-error',
-              },
-              minimap: {
-                color: { id: "minimap.errorHighlight" },
-                position: this.monaco?.editor?.MinimapPosition.Inline,
+                // minimap 属于 IModelDecorationOptions 的字段（原代码误放在与 options 平级处，导致小地图高亮从未生效）
+                minimap: {
+                  color: { id: "minimap.errorHighlight" },
+                  position: monaco.editor.MinimapPosition.Inline,
+                },
               },
             },
             {

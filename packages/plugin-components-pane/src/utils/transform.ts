@@ -38,20 +38,26 @@ export interface StandardMeta {
   groupList: Text[];
 }
 
-export interface SortedGroups {
-  categories: Array<{
-    name: Text;
-    priority: number;
-    components: StandardComponentMeta[];
-  }>;
+export interface SortedCategory {
   name: Text;
+  priority: number;
+  components: StandardComponentMeta[];
+}
+
+export interface SortedGroups {
+  categories: SortedCategory[];
+  name: Text;
+  /** 排序权重，数值大的分组靠前 */
+  priority: number;
+  /** 以 t(category) 为键的临时索引，便于去重合并同一分类 */
+  content: Record<string, SortedCategory>;
 }
 
 export interface IgnoreComponents {
   [key: string]: string[];
 }
 
-export default function transform(raw: any, t: (input: Text) => string) {
+export default function transform(raw: any, t: (input?: Text) => string) {
   let groupList: Text[] = [];
   let categoryList: Text[] = [];
   let ignoreComponents: IgnoreComponents = {};
@@ -73,15 +79,17 @@ export default function transform(raw: any, t: (input: Text) => string) {
     const map = {} as any;
     groupList = raw.sort.groupList;
     categoryList = raw.sort.categoryList;
-    componentList = raw.components?.filter(component => {
-      const ignore = component?.hidden || !component?.snippets?.length || (ignoreComponents[component?.npm?.package]||{})[component.componentName];
+    componentList = raw.components?.filter((component: StandardComponentMeta & { hidden?: boolean; npm?: { package?: string } }) => {
+      const ignoredNames: Record<string, boolean> = (ignoreComponents[component?.npm?.package ?? ''] || {}) as unknown as Record<string, boolean>;
+      const ignore = component?.hidden || !component?.snippets?.length || ignoredNames[String(component.componentName)];
       return !ignore;
     }).map((component: StandardComponentMeta) => {
-      component.snippets.forEach(snippet => {
+      component.snippets?.forEach(snippet => {
         snippet.id = `${t(component.group)}_${t(component.category)}_${component.componentName}_${snippet.title}`;
         snippets.push(snippet);
       });
-      const { group = createI18n('默认分组', 'DefaultGroup'), category, priority: componentPriority = 0 } = component;
+      const { group = createI18n('默认分组', 'DefaultGroup'), priority: componentPriority = 0 } = component;
+      const category: Text = component.category ?? createI18n('其他', 'Others');
       component.group = group;
       component.priority = componentPriority;
       const indexOfCategory = categoryList.indexOf(category);
@@ -89,7 +97,7 @@ export default function transform(raw: any, t: (input: Text) => string) {
       if (!map[t(group)]) {
         const groupIndex = groupList.indexOf(group);
         const groupPriority = groupIndex === -1 ? -1 : (groupList.length - groupIndex);
-        const obj = {
+        const obj: SortedGroups = {
           name: group,
           content: {},
           categories: [],
@@ -99,9 +107,9 @@ export default function transform(raw: any, t: (input: Text) => string) {
         map[t(group)] = obj;
         groups.push(obj);
       }
-      const currentGroup = map[t(group)];
+      const currentGroup: SortedGroups = map[t(group)];
       if (!currentGroup.content[t(category)]) {
-        const cateObj = {
+        const cateObj: SortedCategory = {
           components: [],
           name: category,
           priority: categoryPriority,
@@ -123,9 +131,9 @@ export default function transform(raw: any, t: (input: Text) => string) {
       .pipe(formatSnippets)
       .pipe((stdComponent: StandardComponentMeta) => {
         const { sort } = stdComponent;
-        if (stdComponent.snippets.length) {
+        if (stdComponent.snippets?.length) {
           stdComponent.snippets.forEach(snippet => {
-            snippet.id = `${t(sort.group)}_${t(sort.category)}_${snippet.componentName}_${snippet.title}`;
+            snippet.id = `${t(sort?.group)}_${t(sort?.category)}_${snippet.componentName}_${snippet.title}`;
             snippets.push(snippet);
           });
         }
@@ -133,7 +141,10 @@ export default function transform(raw: any, t: (input: Text) => string) {
       })
       .pipe((stdComponent: StandardComponentMeta) => {
         const { sort } = stdComponent;
-        const { group, category, priority = 0 } = sort;
+        // formatSort 已保证 sort.group / sort.category 必有值，这里再兜底以满足类型
+        const group: Text = sort?.group ?? createI18n('组件', 'Components');
+        const category: Text = sort?.category ?? createI18n('其他', 'Others');
+        const priority = sort?.priority ?? 0;
 
         const hasGroup = textExistIn(group, groupList, t);
 
@@ -141,7 +152,7 @@ export default function transform(raw: any, t: (input: Text) => string) {
           if (!map[t(group)]) {
             const groupIndex = groupList.indexOf(group);
             const groupPriority = groupIndex === -1 ? -1 : (groupList.length - groupIndex);
-            const obj = {
+            const obj: SortedGroups = {
               name: group,
               content: {},
               categories: [],
@@ -151,9 +162,9 @@ export default function transform(raw: any, t: (input: Text) => string) {
             map[t(group)] = obj;
             groups.push(obj);
           }
-          const currentGroup = map[t(group)];
+          const currentGroup: SortedGroups = map[t(group)];
           if (!currentGroup.content[t(category)]) {
-            const cateObj = {
+            const cateObj: SortedCategory = {
               components: [],
               name: category,
               priority,
@@ -197,11 +208,11 @@ export default function transform(raw: any, t: (input: Text) => string) {
   };
 }
 
-function flatten(item) {
+function flatten(item: any): any[] {
   if (typeof item === 'object') {
     // 带children，当做分组处理
     if (item?.children?.length) {
-      return item.children.map((c) => ({
+      return item.children.map((c: any) => ({
         category: item.title,
         ...c,
       }));
@@ -214,7 +225,7 @@ function flatten(item) {
   return [];
 }
 
-function formatSort(item) {
+function formatSort(item: any): any[] {
   const { sort = {} } = item;
   const category = sort.category || item.category;
   const useDefaultCategory = !category;
@@ -233,7 +244,7 @@ function formatSort(item) {
   return [item];
 }
 
-function formatSnippets(item) {
+function formatSnippets(item: any): any[] {
   item.snippets = item.snippets || [];
 
   if (item.snippets.length === 0) {
@@ -266,18 +277,18 @@ function formatSnippets(item) {
 }
 
 export function getTextReader(lang: string) {
-  return (input: Text): string => {
+  return (input?: Text): string => {
     if (typeof input === 'string') {
       return input;
     }
-    if (typeof input === 'object' && input.type === 'i18n') {
+    if (input && typeof input === 'object' && input.type === 'i18n') {
       return input[lang];
     }
     return '';
   };
 }
 
-export function createI18n(zh_CN, en_US): Text {
+export function createI18n(zh_CN: string, en_US: string): Text {
   return {
     zh_CN,
     en_US,
@@ -286,16 +297,16 @@ export function createI18n(zh_CN, en_US): Text {
 }
 
 export function pipe(arr: any[]) {
-  const fns = [];
+  const fns: Array<(item: any) => any[]> = [];
 
-  const last = (ret) => ret;
+  const last = (ret: any[]) => ret;
 
-  function run(buffer, fn, next) {
+  function run(buffer: any[], fn: (item: any) => any[], next: (input: any[]) => any[]) {
     if (!buffer?.length) {
       return [];
     }
     const push = [...buffer];
-    const pop = [];
+    const pop: any[] = [];
     for (const item of push) {
       const result = fn(item) || [];
       const data = next(result) || [];
@@ -310,14 +321,16 @@ export function pipe(arr: any[]) {
       return this;
     },
     run() {
-      const process = [...fns, last].reduceRight((next, fn) => {
-        return (input) => run(input, fn, next);
-      });
+      // 从右向左把每个转换函数串成 (input) => output 的处理链
+      const steps: Array<(input: any[]) => any[]> = [...fns, last];
+      const process = steps.reduceRight(
+        (next, fn) => (input: any[]) => run(input, fn, next),
+      );
       return process(arr);
     },
   };
 }
 
-export function textExistIn(text: Text, arr: Text[], t: (input: Text) => string) {
+export function textExistIn(text: Text, arr: Text[], t: (input?: Text) => string) {
   return !!arr.find((item) => t(item) === t(text));
 }

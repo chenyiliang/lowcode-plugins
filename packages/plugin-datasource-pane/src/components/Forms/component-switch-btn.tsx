@@ -11,10 +11,12 @@ import { isJSExpression, JSExpression } from '@alilc/lowcode-types';
 export interface ComponentSwitchBtnCompProps {
   className?: string;
   style?: React.CSSProperties;
-  component: string;
-  originalComponent: string;
+  component?: string;
+  originalComponent?: string;
   setComponent: (component: string) => void;
-  field: Field
+  // 本组件需要 value / setValue / setComponent，这些只在 Field（而非 VoidField）上存在，
+  // 故声明为 Field；mapProps 注入的 GeneralField 在边界处收窄（该表单节点恒为数据字段）
+  field: Field;
 }
 
 export interface ComponentSwitchBtnCompState {
@@ -30,10 +32,10 @@ class ComponentSwitchBtnCompComp extends PureComponent<
   static defaultProps = {};
 
   state: ComponentSwitchBtnCompState = {
-    currentComponent: this.props.originalComponent,
+    currentComponent: this.props.originalComponent ?? '',
   };
 
-  private originalComponent = null;
+  private originalComponent: string | undefined;
 
   componentDidMount() {
     this.originalComponent = this.props.originalComponent;
@@ -48,7 +50,9 @@ class ComponentSwitchBtnCompComp extends PureComponent<
   handleSwitch = () => {
     const { field, setComponent } = this.props
 
-    let nextComponent = null;
+    // component / originalComponent 均可能缺省（映射自 field.component[0]），
+    // 保持原实现语义：未命中下列 case 时走 default 分支
+    let nextComponent: string | undefined;
     if (this.state.currentComponent === this.originalComponent) {
       nextComponent = this.props.component;
     } else {
@@ -113,10 +117,16 @@ class ComponentSwitchBtnCompComp extends PureComponent<
 export const ComponentSwitchBtn = connect(
   ComponentSwitchBtnCompComp,
   mapProps((props, field) => {
+    // formily 的 IStateMapper 要求返回完整的 Props（运行时按 Object.assign(props, mapped) 合并），
+    // 这里显式展开原 props 再覆盖映射字段，与运行时合并结果完全一致且满足类型。
+    // mapProps 给出的是 GeneralField；本组件作为数据字段组件接收到的恒为 Field，
+    // 因此在边界处做一次同构收窄（Field 上才有 value / setValue / setComponent）。
+    const dataField = field as Field;
     return {
-      field,
-      setComponent: field.setComponent,
-      originalComponent: _get(field, 'component[0]'),
+      ...props,
+      field: dataField,
+      setComponent: dataField.setComponent,
+      originalComponent: _get(dataField, 'component[0]'),
     };
   }),
 );

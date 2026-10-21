@@ -8,7 +8,7 @@ import _noop from 'lodash/noop';
 import _isArray from 'lodash/isArray';
 import _last from 'lodash/last';
 import _isPlainObject from 'lodash/isPlainObject';
-import MonacoEditor from '@alilc/lowcode-plugin-base-monaco-editor';
+import MonacoEditor, { type IMonacoInstance, type IEditorInstance } from '@alilc/lowcode-plugin-base-monaco-editor';
 import type { editor } from 'monaco-editor';
 import { RuntimeDataSourceConfig as DataSourceConfig } from '@alilc/lowcode-datasource-types';
 import Ajv from 'ajv';
@@ -58,7 +58,8 @@ export class DataSourceImportPluginCode extends PureComponent<
     });
   };
 
-  private monacoRef: any;
+  // monaco 的 editor 命名空间（getModelMarkers 等静态方法所在的对象）
+  private monacoRef: IMonacoInstance['editor'] | undefined;
 
   constructor(props: DataSourceImportPluginCodeProps) {
     super(props);
@@ -98,7 +99,7 @@ export class DataSourceImportPluginCode extends PureComponent<
     if (this.monacoRef) {
       if (
         !this.monacoRef
-          .getModelMarkers()
+          .getModelMarkers({})
           .find((marker: editor.IMarker) => marker.owner === 'json')
       ) {
         Message.success("检验成功，点击右上方确定完成导入！")
@@ -116,7 +117,7 @@ export class DataSourceImportPluginCode extends PureComponent<
     if (this.monacoRef) {
       if (
         !this.monacoRef
-          .getModelMarkers()
+          .getModelMarkers({})
           .find((marker: editor.IMarker) => marker.owner === 'json')
       ) {
         this.setState({ isCodeValid: true, code: newValue });
@@ -127,8 +128,9 @@ export class DataSourceImportPluginCode extends PureComponent<
   /* @author daifuyang
   ** @description：修复编辑器挂载事件
   */
-  handleEditorDidMount = (editor: MonacoEditor, monaco: MonacoEditor) => {
-    this.monacoRef = editor?.editor;
+  // editorDidMount 的签名是 (monaco, editor)；此处保存 monaco 的 editor 命名空间
+  handleEditorDidMount = (monaco: IMonacoInstance, _editor: IEditorInstance) => {
+    this.monacoRef = monaco?.editor;
   };
 
 

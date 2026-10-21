@@ -1,23 +1,58 @@
 import * as React from 'react';
 import { useRef, useEffect, useMemo, useState } from 'react';
 import classNames from 'classnames';
-import type { editor } from 'monaco-editor';
+import type { editor, IDisposable } from 'monaco-editor';
 import {
   ISingleMonacoEditorProps,
+  IGeneralManacoEditorProps,
   WORD_EDITOR_INITIALIZING,
   useEditor,
   IDiffMonacoEditorProps,
   INITIAL_OPTIONS,
 } from './helper';
+import './index.scss';
 
 export * from './monaco';
 export * from './controller';
+export * from './helper';
 
-const SingleMonacoEditor = (props: ISingleMonacoEditorProps) => {
+function noop() {}
+
+/**
+ * 组件默认属性。
+ *
+ * React 19 移除了函数组件的 `defaultProps`，因此这里集中定义默认值，
+ * 通过 `withDefaults` 在 props 为 undefined 时回填（与旧 defaultProps 语义一致）。
+ */
+export const EDITOR_DEFAULT_PROPS = {
+  width: '100%' as number | string,
+  height: 150 as number | string,
+  defaultValue: '',
+  language: 'javascript',
+  options: INITIAL_OPTIONS as Record<string, any>,
+  editorDidMount: noop as NonNullable<IGeneralManacoEditorProps['editorDidMount']>,
+  editorWillMount: noop as NonNullable<IGeneralManacoEditorProps['editorWillMount']>,
+  onChange: noop,
+  requireConfig: {} as Record<string, any>,
+};
+
+/** 用默认值回填 props 中值为 undefined 的字段（React 19 替代 defaultProps 的写法） */
+function withDefaults<P extends Record<string, any>>(props: P) {
+  const merged: Record<string, any> = { ...EDITOR_DEFAULT_PROPS };
+  for (const key of Object.keys(props) as Array<keyof P>) {
+    if (props[key] !== undefined) {
+      merged[key as string] = props[key];
+    }
+  }
+  return { ...props, ...merged } as P & typeof EDITOR_DEFAULT_PROPS;
+}
+
+const SingleMonacoEditor = (rawProps: ISingleMonacoEditorProps) => {
+  const props = withDefaults(rawProps);
   const { onChange, enableOutline, width, height, language, supportFullScreen } = props;
   const onChangeRef = useRef(onChange);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [fullScreenStyle, setFullScreenStyle] = useState({});
+  const [fullScreenStyle, setFullScreenStyle] = useState<React.CSSProperties>({});
 
   const {
     isEditorReady,
@@ -28,7 +63,7 @@ const SingleMonacoEditor = (props: ISingleMonacoEditorProps) => {
     editorRef,
     valueRef,
   } = useEditor<editor.IStandaloneCodeEditor>('single', props);
-  const subscriptionRef = useRef(null);
+  const subscriptionRef = useRef<IDisposable | null>(null);
 
   const className = classNames('lc-code-control', props.className, {
     've-focused': focused,
@@ -56,12 +91,12 @@ const SingleMonacoEditor = (props: ISingleMonacoEditorProps) => {
       const editorInstance = editorRef.current;
       subscriptionRef.current?.dispose();
       subscriptionRef.current = editorInstance?.onDidChangeModelContent((event: any) => {
-        const editorValue = editorInstance?.getModel().getValue();
+        const editorValue = editorInstance?.getModel()?.getValue();
 
         if (valueRef.current !== editorValue) {
-          onChangeRef.current?.(editorValue, event);
+          (onChangeRef.current as ISingleMonacoEditorProps['onChange'])?.(editorValue ?? '', event);
         }
-      });
+      }) ?? null;
     }
   }, [editorRef, isEditorReady, subscriptionRef, valueRef]);
 
@@ -70,8 +105,7 @@ const SingleMonacoEditor = (props: ISingleMonacoEditorProps) => {
       const editorInstance = editorRef.current;
       subscriptionRef.current?.dispose();
       editorInstance?.getModel()?.dispose();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      editorRef.current?.dispose();
+      editorInstance?.dispose();
     };
   }, [editorRef]);
 
@@ -80,7 +114,10 @@ const SingleMonacoEditor = (props: ISingleMonacoEditorProps) => {
       return;
     }
 
-    monacoRef.current?.editor.setModelLanguage((editorRef.current)?.getModel(), language);
+    const model = editorRef.current?.getModel();
+    if (model) {
+      monacoRef.current?.editor.setModelLanguage(model, language);
+    }
   }, [editorRef, isEditorReady, language, monacoRef]);
 
   const fullScreen = () => {
@@ -132,7 +169,8 @@ const SingleMonacoEditor = (props: ISingleMonacoEditorProps) => {
   );
 };
 
-const DiffMonacoEditor = (props: IDiffMonacoEditorProps) => {
+const DiffMonacoEditor = (rawProps: IDiffMonacoEditorProps) => {
+  const props = withDefaults(rawProps);
   const { enableOutline, width, height, language, original } = props;
 
   const { isEditorReady, focused, loading, containerRef, monacoRef, editorRef } = useEditor<editor.IStandaloneDiffEditor>(
@@ -153,14 +191,14 @@ const DiffMonacoEditor = (props: IDiffMonacoEditorProps) => {
     if (!isEditorReady) {
       return;
     }
-    (editorRef.current).getModel().original.setValue(original ?? '');
+    editorRef.current?.getModel()?.original?.setValue(original ?? '');
   }, [editorRef, isEditorReady, original]);
 
   useEffect(() => {
     return () => {
-      editorRef.current?.getModel().original?.dispose();
-      editorRef.current?.getModel().modified?.dispose();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const model = editorRef.current?.getModel();
+      model?.original?.dispose();
+      model?.modified?.dispose();
       editorRef.current?.dispose();
     };
   }, [editorRef]);
@@ -170,7 +208,11 @@ const DiffMonacoEditor = (props: IDiffMonacoEditorProps) => {
       return;
     }
 
-    const { original: originalModel, modified: modifiedModel } = editorRef.current?.getModel();
+    const model = editorRef.current?.getModel();
+    if (!model) {
+      return;
+    }
+    const { original: originalModel, modified: modifiedModel } = model;
 
     monacoRef.current?.editor.setModelLanguage(originalModel, language);
     monacoRef.current?.editor.setModelLanguage(modifiedModel, language);
@@ -188,37 +230,13 @@ const DiffMonacoEditor = (props: IDiffMonacoEditorProps) => {
   );
 };
 
-const DiffMonacoEditorComponent = Object.assign(DiffMonacoEditor, {
+export const DiffMonacoEditorComponent = Object.assign(DiffMonacoEditor, {
   displayName: 'DiffMonacoEditor',
-  defaultProps: {
-    width: '100%',
-    height: 150,
-    defaultValue: '',
-    language: 'javascript',
-    options: INITIAL_OPTIONS,
-    editorDidMount: noop,
-    editorWillMount: noop,
-    onChange: noop,
-    requireConfig: {},
-  },
 });
 
 export const SingleMonacoEditorComponent = Object.assign(SingleMonacoEditor, {
   displayName: 'SingleMonacoEditor',
-  defaultProps: {
-    width: '100%',
-    height: 150,
-    defaultValue: '',
-    language: 'javascript',
-    options: INITIAL_OPTIONS,
-    editorDidMount: noop,
-    editorWillMount: noop,
-    onChange: noop,
-    requireConfig: {},
-  },
   MonacoDiffEditor: DiffMonacoEditorComponent,
 });
 
 export default SingleMonacoEditorComponent;
-
-function noop() {}

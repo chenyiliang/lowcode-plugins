@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
+import classNames from 'classnames';
 import cls from 'classnames/bind';
 import style from './index.module.scss';
 
@@ -14,8 +15,14 @@ interface State {
   offset: number;
 }
 
+interface MenuItem {
+  title?: ReactNode;
+  index: number;
+  children?: ReactNode;
+}
+
 export default class Tab extends React.Component<Props, State> {
-  static Item;
+  static Item: (props: { title?: ReactNode; children?: ReactNode }) => ReactNode;
 
   state: State = {
     active: 0,
@@ -53,13 +60,13 @@ export default class Tab extends React.Component<Props, State> {
   format = () => {
     const { children } = this.props;
     const childs = React.Children.toArray(children);
-    const menus = [];
+    const menus: MenuItem[] = [];
     for (let i = 0; i < childs.length; i += 1) {
-      const { props } = childs[i] as React.ReactElement;
+      const childProps = (childs[i] as React.ReactElement<{ title?: ReactNode; children?: ReactNode }>).props;
       menus.push({
-        title: props?.title,
+        title: childProps?.title,
         index: i,
-        children: props.children,
+        children: childProps?.children,
       });
     }
 
@@ -68,7 +75,7 @@ export default class Tab extends React.Component<Props, State> {
     };
   };
 
-  handleSelect = (active) => {
+  handleSelect = (active: number) => {
     this.setState({
       active,
       offset: this.getIndicatorPos(active),
@@ -82,7 +89,8 @@ export default class Tab extends React.Component<Props, State> {
     const { menus } = this.format();
 
     return (
-      <div className={cls(className, cx('tab'))}>
+      // className 是外部传入的全局类名（非 CSS Module 键），故用未绑定的 classNames
+      <div className={classNames(className, cx('tab'))}>
         <div className={cx('header')}>
           <div className={cx('indicator')} style={{ left: offset }} />
           <div className={cx('items')} ref={this.menus}>
@@ -120,6 +128,6 @@ export default class Tab extends React.Component<Props, State> {
   }
 }
 
-Tab.Item = function TabItem({ children }) {
+Tab.Item = function TabItem({ children }: { title?: ReactNode; children?: ReactNode }) {
   return children;
 };

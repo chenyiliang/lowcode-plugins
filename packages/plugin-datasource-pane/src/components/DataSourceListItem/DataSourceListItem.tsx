@@ -3,7 +3,7 @@ import React, { PureComponent, Component, CSSProperties } from 'react';
 import { Button, Icon, Checkbox, Tag, Balloon } from '@alifd/next';
 import { RuntimeDataSourceConfig as DataSourceConfig } from '@alilc/lowcode-datasource-types';
 import cn from 'classnames';
-import { DragSource, DropTarget } from 'react-dnd';
+import { DragSource, DropTarget, ConnectDragSource, ConnectDragPreview, ConnectDropTarget } from 'react-dnd';
 import _uniqueId from 'lodash/uniqueId';
 import type { DataSourceInfoTag } from '../../types';
 import { DataSourcePanelMode } from '../../pane';
@@ -16,7 +16,7 @@ export const ListDndTypes = {
   DATASOURCE_ITEM: 'DATASOURCE_ITEM',
 };
 
-function defaultRenderInfoTags(dataSource: DataSourceConfig) {
+function defaultRenderInfoTags(dataSource: DataSourceConfig): DataSourceInfoTag[] {
   return [
     {
       type: 'primary',
@@ -57,9 +57,14 @@ export interface DataSourceListItemProps {
   isDragging: boolean;
   isOver: boolean;
   dropResult: any;
+  /**
+   * 迁移说明：这三个回调原先声明的形参与真实实现/调用点不符
+   * （DataSourceList.handleDragOver 只收 1 个 id，handleDrop 不收参数），
+   * 按实际实现修正签名，避免类型与运行时行为不一致。
+   */
   onStartDrag?: (id: string) => void;
-  onDragOver?: (from: string, to: string) => void;
-  onDrop?: (from: string, to: string) => void;
+  onDragOver?: (dragOverId: string) => void;
+  onDrop?: () => void;
   mode: DataSourcePanelMode;
   onToggleSelect?: (id: string) => void;
   selected: boolean;
@@ -69,13 +74,13 @@ export interface DataSourceListItemProps {
 export class DataSourceListItem extends Component<DataSourceListItemProps> {
   static contextType = DataSourcePaneContext;
 
+  // React 19：使用 static contextType 的类需显式声明 context 类型，否则 this.context 为 unknown
+  declare context: React.ContextType<typeof DataSourcePaneContext>;
+
   componentDidUpdate(prevProps: DataSourceListItemProps) {
     if (prevProps.dropResult !== this.props.dropResult) {
       if (this.props.dropResult?.moved) {
-        this.handleDragEnd(
-          this.props.dropResult?.from,
-          this.props?.dropResult?.to,
-        );
+        this.handleDragEnd();
       }
     }
     if (
@@ -90,8 +95,9 @@ export class DataSourceListItem extends Component<DataSourceListItemProps> {
     }
   }
 
-  handleDragEnd = (from, to) => {
-    this.props.onDrop?.(from, to);
+  handleDragEnd = () => {
+    // 排序结果已由 onDragOver 写入父组件 state，这里只需触发保存
+    this.props.onDrop?.();
   };
 
   handleExportCheckChange = () => {
@@ -111,8 +117,8 @@ export class DataSourceListItem extends Component<DataSourceListItemProps> {
       renderInfoTags = defaultRenderInfoTags,
     } = this.props;
 
-    // 拖拽中，需要向右偏移 8p，避免覆盖
-    const offsetStyle = mode === DataSourcePanelMode.SORTING ? { marginLeft: '8px' } : null;
+    // 拖拽中，需要向右偏移 8p，避免覆盖（React style 用 undefined 表示无内联样式）
+    const offsetStyle = mode === DataSourcePanelMode.SORTING ? { marginLeft: '8px' } : undefined;
 
     return this.props?.connectDropTarget?.(
       this.props?.connectDragPreview?.(
@@ -215,7 +221,9 @@ interface DataSourceListItemOperationProps {
   title: string;
   icon?: string;
   type: string;
-  onOperationClick: (operationType: string, dataSourceId: string) => void;
+  // 可选：与父组件 DataSourceListItemProps.onOperationClick 保持一致，
+  // 且本组件内部本就以 onOperationClick?.() 方式调用
+  onOperationClick?: (operationType: string, dataSourceId: string) => void;
 }
 
 export class DataSourceListItemOperation extends PureComponent<DataSourceListItemOperationProps> {
@@ -252,10 +260,41 @@ export class DataSourceListItemOperation extends PureComponent<DataSourceListIte
     );
   }
 }
-const DraggableDataSourceListItem = DragSource(
+/** 拖拽中的数据项：beginDrag 产出，drop/isDragging 消费 */
+interface DataSourceDragItem {
+  id: string;
+}
+
+/** drop 返回的结果，DataSourceListItem 通过 dropResult prop 读取 */
+interface DataSourceDropResult {
+  moved: boolean;
+  from: string;
+  to: string;
+}
+
+interface DragCollectedProps {
+  connectDragSource: ConnectDragSource;
+  connectDragPreview: ConnectDragPreview;
+  isDragging: boolean;
+}
+
+interface DropCollectedProps {
+  connectDropTarget: ConnectDropTarget;
+  dropResult: DataSourceDropResult | null;
+  isOver: boolean;
+}
+
+// DragSource/DropTarget 的 spec 回调形参需要显式泛型才能推断出 props 与 monitor 类型，
+// 否则 props 会退化为 {} 导致 `props.dataSource` 报错
+const DraggableDataSourceListItem = DragSource<
+  DataSourceListItemProps,
+  DragCollectedProps,
+  DataSourceDragItem,
+  DataSourceDropResult
+>(
   ListDndTypes.DATASOURCE_ITEM,
   {
-    canDrag(props) {
+    canDrag(_props) {
       return true;
     },
 
@@ -264,16 +303,15 @@ const DraggableDataSourceListItem = DragSource(
       // (like a card in Kanban board dragged between lists)
       // you can implement something like this to keep its
       // appearance dragged:
-      return monitor.getItem().id === props?.dataSource?.id;
+      return monitor.getItem()?.id === props?.dataSource?.id;
     },
 
-    beginDrag(props, monitor, component) {
+    beginDrag(props, _monitor, _component): DataSourceDragItem {
       // Return the data describing the dragged item
-      const item = { id: props?.dataSource?.id };
-      return item;
+      return { id: props?.dataSource?.id };
     },
 
-    endDrag(props, monitor, component) {
+    endDrag(_props, monitor, _component) {
       if (!monitor.didDrop()) {
         // You can check whether the drop was successful
         // or if the drag ended but nobody handled the drop
@@ -291,6 +329,8 @@ const DraggableDataSourceListItem = DragSource(
 
       // This is a good place to call some Flux action
       // CardActions.moveCardToList(item.id, dropResult.listId)
+      void item;
+      void dropResult;
     },
   },
   (connect, monitor) => {
@@ -302,12 +342,17 @@ const DraggableDataSourceListItem = DragSource(
   },
 )(DataSourceListItem);
 
-export const DroppableDataSourceListItem = DropTarget(
+export const DroppableDataSourceListItem = DropTarget<
+  DataSourceListItemProps,
+  DropCollectedProps,
+  DataSourceDragItem,
+  DataSourceDropResult
+>(
   ListDndTypes.DATASOURCE_ITEM,
   {
-    drop: (props, monitor, component) => {
+    drop: (props, monitor, _component) => {
       if (monitor.didDrop()) {
-        return;
+        return undefined;
       }
       const item = monitor.getItem();
       return { moved: true, from: item.id, to: props?.dataSource?.id };

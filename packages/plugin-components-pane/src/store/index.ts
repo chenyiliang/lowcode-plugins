@@ -1,4 +1,4 @@
-import { SnippetMeta } from '@/utils/transform';
+import { SnippetMeta } from '../utils/transform';
 
 export default class ComponentManager {
   snippets = new Map<string, SnippetMeta>();

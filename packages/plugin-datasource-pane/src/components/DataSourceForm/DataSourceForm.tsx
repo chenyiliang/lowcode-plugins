@@ -180,7 +180,7 @@ const SCHEMA = {
  * 通过是否存在 ID 来决定读写状态
  */
 export class DataSourceForm extends PureComponent<DataSourceFormProps, { form: FormilyForm } > {
-  constructor (props) {
+  constructor (props: DataSourceFormProps) {
     super(props)
 
     this.state = {

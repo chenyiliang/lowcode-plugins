@@ -1,4 +1,4 @@
-import { editorController } from '@/Controller';
+import { editorController } from '../../Controller';
 import isArray from 'lodash/isArray';
 import isObject from 'lodash/isObject';
 

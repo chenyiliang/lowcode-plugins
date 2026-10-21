@@ -3,11 +3,12 @@ import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react
 import MonacoEditor from '@alilc/lowcode-plugin-base-monaco-editor';
 
 import { Dialog, Message, Button } from '@alifd/next';
-import { IPublicEnumTransformStage, IPublicModelPluginContext } from '@alilc/lowcode-types';
-import { IEditorInstance } from '@alilc/lowcode-plugin-base-monaco-editor/lib/helper';
+import { IPublicEnumTransformStage } from '@alilc/lowcode-types';
+import type { editor as monacoEditorNs } from 'monaco-editor';
+import { SchemaPluginContext } from './context';
 
 interface PluginCodeDiffProps {
-  pluginContext: IPublicModelPluginContext;
+  pluginContext: SchemaPluginContext;
   // 是否显示项目级 schema
   showProjectSchema: boolean;
 }
@@ -24,7 +25,8 @@ export default function PluginSchema({ pluginContext, showProjectSchema = false 
   const [schemaValue, setSchemaValue] = useState(() => {
     return getSchemaStr();
   });
-  const monacoEditorRef = useRef<IEditorInstance>();
+  // 本面板挂载的是单文件编辑器（getValue 只在 IStandaloneCodeEditor 上）
+  const monacoEditorRef = useRef<monacoEditorNs.IStandaloneCodeEditor | undefined>(undefined);
 
   const resize = useCallback(() => {
     setEditorSize({
@@ -34,7 +36,7 @@ export default function PluginSchema({ pluginContext, showProjectSchema = false 
   }, []);
 
   useLayoutEffect(() => {
-    const cancelListenShowPanel = skeleton.onShowPanel((pluginName: string) => {
+    const cancelListenShowPanel = skeleton.onShowPanel((pluginName?: string) => {
       if (pluginName == 'LowcodePluginAliLowcodePluginSchema') {
         setSchemaValue(getSchemaStr());
       }
@@ -59,7 +61,7 @@ export default function PluginSchema({ pluginContext, showProjectSchema = false 
         try {
           json = JSON.parse(monacoEditorRef.current?.getValue() ?? schemaValue);
         } catch (err) {
-          Message.error('Cannot save schema. Schema Parse Error.' + err.message);
+          Message.error('Cannot save schema. Schema Parse Error.' + (err as Error).message);
           return;
         }
         if (showProjectSchema) {
@@ -95,11 +97,13 @@ export default function PluginSchema({ pluginContext, showProjectSchema = false 
           setSchemaValue(input);
         }}
         editorDidMount={(_, monacoEditor) => {
-          monacoEditorRef.current = monacoEditor
-          monacoEditor.addAction({
+          // 单文件编辑器：联合类型 IEditorInstance 在这里恒为 IStandaloneCodeEditor
+          const codeEditor = monacoEditor as monacoEditorNs.IStandaloneCodeEditor;
+          monacoEditorRef.current = codeEditor;
+          codeEditor.addAction({
             id: 'my-unique-id',
             label: 'Save Schema',
-            keybindingContext: null,
+            keybindingContext: undefined,
             contextMenuGroupId: 'navigation',
             contextMenuOrder: 1.5,
             run: onSave,

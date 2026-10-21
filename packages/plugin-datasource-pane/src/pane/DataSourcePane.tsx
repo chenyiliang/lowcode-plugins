@@ -9,7 +9,7 @@ import {
 } from '@alilc/lowcode-datasource-types';
 import { Button, Message, Dialog } from '@alifd/next';
 import _isArray from 'lodash/isArray';
-import { createStateMachine } from '../utils/stateMachine';
+import { getInitialSnapshot, type DataSourcePaneState as PaneSnapshot, type DataSourcePaneStateEvent } from '../utils/stateMachine';
 import { DataSourcePaneContext } from '../utils/panel-context';
 import { DataSourceFilter } from '../components/DataSourceFilter';
 import { DataSourceOperations } from '../components/DataSourceOperations';
@@ -52,7 +52,7 @@ export interface DataSourcePaneProps {
 
 export interface DataSourcePaneState {
   // TOOD
-  current: any;
+  current: PaneSnapshot;
   listMode: DataSourcePanelMode;
 }
 
@@ -62,11 +62,14 @@ export class DataSourcePane extends PureComponent<
 > {
   static contextType = DataSourcePaneContext;
 
-  private serviceS: any;
+  // React 19：使用 static contextType 的类需显式声明 context 类型，否则 this.context 为 unknown
+  declare context: React.ContextType<typeof DataSourcePaneContext>;
+
+  private serviceS: { unsubscribe: () => void } | undefined;
 
   state: DataSourcePaneState = {
-    // TODO
-    current: createStateMachine(this.props.initialSchema?.list).initialState,
+    // xstate v5 移除了 machine.initialState，改用 getInitialSnapshot()（见 stateMachine.ts）
+    current: getInitialSnapshot(this.props.initialSchema?.list),
     listMode: DataSourcePanelMode.NORMAL,
   };
 
@@ -76,12 +79,12 @@ export class DataSourcePane extends PureComponent<
 
   importRef ?= createRef<ImportDetail>();
 
-  private send = (...args: any[]) => {
-    this.context.stateService.send(...args);
+  private send = (event: DataSourcePaneStateEvent | string) => {
+    this.context.stateService.send(event);
   };
 
   componentDidMount() {
-    this.serviceS = this.context?.stateService?.subscribe?.((state: any) => {
+    this.serviceS = this.context?.stateService?.subscribe?.((state) => {
       this.setState({ current: state });
       // 监听导入成功事件
       if (state.changed && (state.value === 'idle' || state.event?.type === 'FINISH_IMPORT')) {
@@ -91,11 +94,11 @@ export class DataSourcePane extends PureComponent<
         });
       }
     });
-    this.send({ type: 'UPDATE_DS', payload: this.props.initialSchema?.list });
+    this.send({ type: 'UPDATE_DS', payload: this.props.initialSchema?.list ?? [] });
   }
-  componentDidUpdate(newValue:DataSourcePaneProps) {
+  componentDidUpdate(newValue: DataSourcePaneProps) {
     if (this.props.initialSchema !== newValue.initialSchema) {
-      this.send({ type: 'UPDATE_DS', payload: this.props.initialSchema?.list });
+      this.send({ type: 'UPDATE_DS', payload: this.props.initialSchema?.list ?? [] });
     }
   }
   componentWillUnmount() {
@@ -136,7 +139,8 @@ export class DataSourcePane extends PureComponent<
   };
 
   handleOperationClick = (operationType: string, dataSourceId: string) => {
-    const { dataSourceTypes } = this.props;
+    // dataSourceTypes 是可选 prop，与本组件 render / renderDetail 的处理保持一致，缺省为空数组
+    const { dataSourceTypes = [] } = this.props;
 
     if (operationType === 'view') {
       this.send({
@@ -182,16 +186,22 @@ export class DataSourcePane extends PureComponent<
   };
 
   handleCreate = (dataSourceType: string) => {
-    const { dataSourceTypes } = this.props;
+    const { dataSourceTypes = [] } = this.props;
+    // 状态机 START_CREATE 会读取 event.dataSourceType.type，故找不到对应类型时不能继续发送，
+    // 否则会在 assign 里抛错（原代码用 `!` 掩盖了这一情况）
+    const matched = dataSourceTypes.find((i) => i.type === dataSourceType);
+    if (!matched) {
+      return;
+    }
     this.send({
       type: 'START_CREATE',
-      dataSourceType: dataSourceTypes!.find((i) => i.type === dataSourceType),
+      dataSourceType: matched,
     });
   };
 
   handleOperationFinish = () => {
     const { current } = this.state;
-    if (current.matches('detail.create')) {
+    if (current.matches({ detail: 'create' })) {
       this.detailRef?.current?.submit().then((data) => {
         if (data) {
           this.send({
@@ -200,18 +210,18 @@ export class DataSourcePane extends PureComponent<
           });
         }
       });
-    } else if (current.matches('detail.edit')) {
+    } else if (current.matches({ detail: 'edit' })) {
       this.detailRef?.current?.submit().then((data) => {
         this.send({
           type: 'FINISH_EDIT',
           payload: data,
         });
       });
-    } else if (current.matches('detail.export')) {
+    } else if (current.matches({ detail: 'export' })) {
       this.exportRef?.current?.submit().then(() => {
         this.send('FINISH_EDIT');
       });
-    } else if (current.matches('detail.import')) {
+    } else if (current.matches({ detail: 'import' })) {
       this.importRef?.current?.submit().then((data) => {
         const importDataSourceList = () => {
           this.send({
@@ -251,7 +261,7 @@ export class DataSourcePane extends PureComponent<
     const { dataSourceTypes = [], importPlugins = [], exportPlugins = [], formComponents = [] } = this.props;
     let content = null;
 
-    if (current.matches('detail.edit')) {
+    if (current.matches({ detail: 'edit' })) {
       content = (
         <DataSourceForm
           ref={this.detailRef}
@@ -261,7 +271,7 @@ export class DataSourcePane extends PureComponent<
           mode="edit"
         />
       );
-    } else if (current.matches('detail.view')) {
+    } else if (current.matches({ detail: 'view' })) {
       content = (
         <DataSourceForm
           ref={this.detailRef}
@@ -271,7 +281,7 @@ export class DataSourcePane extends PureComponent<
           dataSourceList={current.context.dataSourceList}
         />
       );
-    } else if (current.matches('detail.create')) {
+    } else if (current.matches({ detail: 'create' })) {
       content = (
         <DataSourceForm
           ref={this.detailRef}
@@ -281,7 +291,7 @@ export class DataSourcePane extends PureComponent<
           mode="create"
         />
       );
-    } else if (current.matches('detail.import')) {
+    } else if (current.matches({ detail: 'import' })) {
       // TODO
       // pluginName
       const currentPluginName = current.context.detail?.data?.pluginName?.name;
@@ -289,7 +299,7 @@ export class DataSourcePane extends PureComponent<
       const Component = (importPlugin ? importPlugin.component : ImportDetail) as React.ElementType;
       content = <Component dataSourceTypes={dataSourceTypes} ref={this.importRef} />;
 
-    } else if (current.matches('detail.export')) {
+    } else if (current.matches({ detail: 'export' })) {
       // TODO
       content = (
         <ExportDetail

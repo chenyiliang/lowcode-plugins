@@ -19,6 +19,7 @@ function CustomTabItem(props: {
 }): React.ReactElement {
   const { resource } = props;
   const { icon: ResourceIcon } = resource;
+  // resource.icon 是一个 ReactElement（非组件），直接渲染而非 <ResourceIcon />
   const propsId = resource.id || resource.options.id;
   const { event } = props.pluginContext;
   const [changed, setChanged] = useState(false);
@@ -64,7 +65,7 @@ function CustomTabItem(props: {
     <ContextMenu menus={props.options?.tabContextMenuActions?.(props.pluginContext, resource) || []}>
       <div className="next-tabs-tab-inner resource-tab-item">
         <div className="resource-tab-item-resource-icon">
-          {ResourceIcon ? <ResourceIcon /> : null}
+          {ResourceIcon ?? null}
         </div>
         <div className="resource-tab-item-title">{title}</div>
         <div className="resource-tab-item-tips">
@@ -247,16 +248,10 @@ function TabsContent(props: {
       contentStyle={{
         height: 0,
       }}
-      tabRender={(
-        key,
-        props: {
-          resource: IPublicModelResource;
-          key: string;
-        }
-      ) => (
+      tabRender={(key: string, tabProps: Record<string, unknown>) => (
         <CustomTabItem
           key={key}
-          resource={props.resource}
+          resource={tabProps.resource as IPublicModelResource}
           pluginContext={pluginContext}
           options={options}
         />
@@ -264,8 +259,10 @@ function TabsContent(props: {
       onChange={(name) => {
         setActiveTitle(name);
         const item = tabs.filter((d) => String(d.id) === String(name))?.[0];
-        const resource = resourceListMap[item.id];
-        workspace.openEditorWindow(resource);
+        const resource = item ? resourceListMap[item.id] : undefined;
+        if (resource) {
+          workspace.openEditorWindow(resource);
+        }
       }}
     >
       {tabs.map((item) => {
@@ -277,8 +274,8 @@ function TabsContent(props: {
         return (
           <Tab.Item
             key={resource.id || resource.options.id}
-            // @ts-ignore
-            resource={resource}
+            // Tab.Item 的类型未声明透传自定义属性，这里把 resource 传给 tabRender 使用
+            {...({ resource } as Record<string, unknown>)}
           />
         );
       })}

@@ -29,30 +29,30 @@ export default class Category extends React.Component<Props, State> {
     });
   };
 
-  beforeEnter = (node) => {
+  beforeEnter = (node: HTMLElement) => {
     this.height = node.offsetHeight;
     node.style.height = '0px';
   };
 
-  onEnter = (node) => {
+  onEnter = (node: HTMLElement) => {
     node.style.height = `${this.height}px`;
   };
 
-  afterEnter = (node) => {
-    this.height = null;
-    node.style.height = null;
+  afterEnter = (node: HTMLElement) => {
+    this.height = 0;
+    node.style.height = '';
   };
 
-  beforeLeave = (node) => {
+  beforeLeave = (node: HTMLElement) => {
     node.style.height = `${node.offsetHeight}px`;
   };
 
-  onLeave = (node) => {
+  onLeave = (node: HTMLElement) => {
     node.style.height = '0px';
   };
 
-  afterLeave = (node) => {
-    node.style.height = null;
+  afterLeave = (node: HTMLElement) => {
+    node.style.height = '';
   };
 
   render() {

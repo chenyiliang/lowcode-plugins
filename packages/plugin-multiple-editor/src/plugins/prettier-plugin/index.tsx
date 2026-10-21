@@ -1,7 +1,7 @@
 import React from 'react';
-import { EditorPluginInterface, Service } from '@/Service';
+import { EditorPluginInterface, Service } from '../../Service';
 import icon from './prettier.png';
-import { HookKeys } from '@/EditorHook';
+import { HookKeys } from '../../EditorHook';
 import { Message } from '@alifd/next';
 
 export class PrettierPlugin implements EditorPluginInterface {

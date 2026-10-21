@@ -1,4 +1,7 @@
-import { TransformedComponentMetadata, FieldConfig } from '@alilc/lowcode-types';
+import type {
+  IPublicTypeTransformedComponentMetadata as TransformedComponentMetadata,
+  IPublicTypeFieldConfig as FieldConfig,
+} from '@alilc/lowcode-types';
 import { v4 as uuidv4 } from 'uuid';
 import { material } from '@alilc/lowcode-engine';
 
@@ -37,7 +40,7 @@ function addonCombine(metadata: TransformedComponentMetadata) {
     configure.combined = [];
   }
 
-  advancedGroup = configure.combined?.filter(d => d.name === '#advanced')[0];
+  advancedGroup = configure.combined?.filter((d: FieldConfig) => d.name === '#advanced')[0];
 
   if (!advancedGroup) {
     advancedGroup = {
@@ -57,7 +60,7 @@ function addonCombine(metadata: TransformedComponentMetadata) {
 
   const advanceItems: FieldConfig[] = advancedGroup.items || [];
 
-  if (!advanceItems || !advanceItems.length || !advanceItems?.filter(d => d.name === 'ref').length) {
+  if (!advanceItems || !advanceItems.length || !advanceItems?.filter((d: FieldConfig) => d.name === 'ref').length) {
     advanceItems.push(refItem);
   }
 

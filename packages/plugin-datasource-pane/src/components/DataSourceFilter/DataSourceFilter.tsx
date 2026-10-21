@@ -22,13 +22,12 @@ export class DataSourceFilter extends PureComponent<
     keyword: '',
   };
 
-  // TODO onFilterChange 类型定义和实际不符
-  handleSearchFilterChange = (filterObj: Record<string, any>) => {
-    // const { keyword } = this.state;
+  // Fusion Search 的 onFilterChange 回调值就是筛选器当前值（string），
+  // 原代码把它标成 Record 再 as unknown as string，这里直接按真实签名声明。
+  handleSearchFilterChange = (filter: string) => {
     const { onFilter } = this.props;
-    // TODO 所以这里转换为 string
     this.setState(
-      { selectedDataSourceType: filterObj as unknown as string },
+      { selectedDataSourceType: filter },
       () => {
         const { keyword, selectedDataSourceType } = this.state;
         onFilter?.(keyword, selectedDataSourceType);
@@ -36,7 +35,8 @@ export class DataSourceFilter extends PureComponent<
     );
   };
 
-  handleChange = (val: string, actionType, item: string) => {
+  // Fusion Search/AutoComplete 的 onChange 签名：(value, actionType, item)
+  handleChange = (val: string, actionType: string, item?: unknown) => {
     if (item === 'clear') {
       this.handleSearch('');
     }

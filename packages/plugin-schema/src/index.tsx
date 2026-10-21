@@ -1,9 +1,15 @@
 import * as React from 'react';
 import { IPublicModelPluginContext } from '@alilc/lowcode-types';
 import PluginSchema from './editor';
+import { SchemaPluginContext } from './context';
 import { enUS, zhCN } from './locale';
 
-const plugin = (ctx: IPublicModelPluginContext, options: any) => {
+interface SchemaPluginOptions {
+  isProjectSchema?: boolean;
+  [key: string]: unknown;
+}
+
+const plugin = (ctx: IPublicModelPluginContext, options: SchemaPluginOptions) => {
   return {
     // 插件的初始化函数，在引擎初始化之后会立刻调用
     init() {
@@ -11,9 +17,11 @@ const plugin = (ctx: IPublicModelPluginContext, options: any) => {
         'en-US': enUS,
         'zh-CN': zhCN,
       });
-      ctx.intl = intl;
-      ctx.intlNode = intlNode;
-      ctx.getLocale = getLocale;
+      // 把国际化方法挂到 ctx 上，供子组件使用（见 SchemaPluginContext）
+      const schemaCtx = ctx as SchemaPluginContext;
+      schemaCtx.intl = intl;
+      schemaCtx.intlNode = intlNode;
+      schemaCtx.getLocale = getLocale;
       const isProjectSchema = (options && options['isProjectSchema']) === true;
 
       // 往引擎增加面板
@@ -31,7 +39,7 @@ const plugin = (ctx: IPublicModelPluginContext, options: any) => {
         },
         content: () => (
           <PluginSchema
-            pluginContext={ctx}
+            pluginContext={schemaCtx}
             showProjectSchema={isProjectSchema}
           />
         ),

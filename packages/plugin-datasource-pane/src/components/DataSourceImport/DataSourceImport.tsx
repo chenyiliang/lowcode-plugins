@@ -7,7 +7,7 @@ import React, { PureComponent } from 'react';
 import _isArray from 'lodash/isArray';
 import _last from 'lodash/last';
 import _isPlainObject from 'lodash/isPlainObject';
-import MonacoEditor from '@alilc/lowcode-plugin-base-monaco-editor';
+import MonacoEditor, { type IMonacoInstance, type IEditorInstance } from '@alilc/lowcode-plugin-base-monaco-editor';
 import type { editor } from 'monaco-editor';
 import { RuntimeDataSourceConfig as DataSourceConfig } from '@alilc/lowcode-datasource-types';
 import Ajv from 'ajv';
@@ -52,8 +52,8 @@ export class DataSourceImport extends PureComponent<
     isCodeValid: true,
   };
 
-  submit = () => {
-    return new Promise((resolve, reject) => {
+  submit = (): Promise<DataSourceConfig[]> => {
+    return new Promise<DataSourceConfig[]>((resolve, reject) => {
       const { isCodeValid, code } = this.state;
 
       if (!isCodeValid) reject(new Error('导入格式有误'));
@@ -63,7 +63,8 @@ export class DataSourceImport extends PureComponent<
     });
   };
 
-  private monacoRef: any;
+  // monaco 的 editor 命名空间（getModelMarkers / getModels 等静态方法所在的对象）
+  private monacoRef: IMonacoInstance['editor'] | undefined;
 
   constructor(props: DataSourceImportProps) {
     super(props);
@@ -73,7 +74,7 @@ export class DataSourceImport extends PureComponent<
     this.handleComplete = this.handleComplete.bind(this);
   }
 
-  deriveValue = (value: any) => {
+  deriveValue = (value: any): DataSourceConfig[] => {
     const { dataSourceTypes } = this.props;
 
     if (!_isArray(dataSourceTypes) || dataSourceTypes.length === 0) return [];
@@ -119,11 +120,11 @@ export class DataSourceImport extends PureComponent<
     if (this.monacoRef) {
       if (
         !this.monacoRef
-          .getModelMarkers()
+          .getModelMarkers({})
           .find((marker: editor.IMarker) => marker.owner === 'json')
       ) {
         this.setState({ isCodeValid: true });
-        const model: any = _last(this.monacoRef.getModels());
+        const model = _last(this.monacoRef.getModels());
         if (!model) return;
         this.props.onImport?.(this.deriveValue(JSON.parse(model.getValue())));
         return;
@@ -136,7 +137,7 @@ export class DataSourceImport extends PureComponent<
     if (this.monacoRef) {
       if (
         !this.monacoRef
-          .getModelMarkers()
+          .getModelMarkers({})
           .find((marker: editor.IMarker) => marker.owner === 'json')
       ) {
         this.setState({ isCodeValid: true, code: newValue });
@@ -144,8 +145,9 @@ export class DataSourceImport extends PureComponent<
     }
   };
 
-  handleEditorDidMount = (editor: MonacoEditor, monaco: MonacoEditor) => {
-    this.monacoRef = editor?.editor;
+  // editorDidMount 的签名是 (monaco, editor)；此处保存 monaco 的 editor 命名空间
+  handleEditorDidMount = (monaco: IMonacoInstance, _editor: IEditorInstance) => {
+    this.monacoRef = monaco?.editor;
   };
 
   render() {

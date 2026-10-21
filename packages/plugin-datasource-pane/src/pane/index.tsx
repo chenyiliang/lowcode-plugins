@@ -1,6 +1,7 @@
 import React, { PureComponent } from 'react';
 import { Message, Button } from '@alifd/next';
 import { InterpretDataSourceConfig } from '@alilc/lowcode-types';
+import type { RuntimeDataSource } from '@alilc/lowcode-datasource-types';
 import { Project, Event, Setters } from '@alilc/lowcode-shell';
 import Logger from 'zen-logger';
 import _get from 'lodash/get';
@@ -49,7 +50,8 @@ export interface DataSourcePanePluginProps {
   // 测试用
   defaultSchema?: DataSource | (() => DataSource);
   onSchemaChange?: (schema: DataSource) => void;
-  onError?: (error: Error) => void;
+  // react-error-boundary 的 onError 形参是 (error: unknown, info: ErrorInfo)
+  onError?: (error: unknown, info: React.ErrorInfo) => void;
 }
 
 export interface DataSourcePanePluginState {
@@ -58,7 +60,8 @@ export interface DataSourcePanePluginState {
   panelKey: number;
 }
 
-export { DataSourcePaneImportPlugin, DataSourceType, DataSourceConfig };
+// isolatedModules 下重新导出类型必须用 `export type`
+export type { DataSourcePaneImportPlugin, DataSourceType, DataSourceConfig };
 
 const BUILTIN_IMPORT_PLUGINS: DataSourcePaneImportPlugin[] = [
   {
@@ -119,7 +122,10 @@ export default class DataSourcePanePlugin extends PureComponent<
     this.stateService.stop();
   }
 
-  handleSchemaChange = (schema: DataSource) => {
+  // DataSourcePane 通过 onSchemaChange 抛出的是运行时数据源（RuntimeDataSource），
+  // 本方法把它写回 project schema 并透传给外部；外部 props 用的是 interpret 形态的 DataSource，
+  // 二者仅在 isInit/requestHandler 的类型上有差异，属 interpret↔runtime 边界，故在此收窄。
+  handleSchemaChange = (schema: RuntimeDataSource) => {
     const { project, onSchemaChange } = this.props;
     if (project) {
       const docSchema = project.exportSchema(common.designerCabin.TransformStage.Save);
@@ -129,7 +135,7 @@ export default class DataSourcePanePlugin extends PureComponent<
       }
     }
 
-    onSchemaChange?.(schema);
+    onSchemaChange?.(schema as unknown as DataSource);
   };
 
   handleReset = () => {
@@ -180,18 +186,21 @@ export default class DataSourcePanePlugin extends PureComponent<
               { /* @ts-ignore */ }
               <DataSourcePane
                 key={panelKey + 1}
-                importPlugins={mergeTwoObjectListByKey(
-                  BUILTIN_IMPORT_PLUGINS as unknown as Array<Record<string, unknown>>,
-                  importPlugins as unknown as Array<Record<string, unknown>>,
+                importPlugins={mergeTwoObjectListByKey<DataSourcePaneImportPlugin>(
+                  BUILTIN_IMPORT_PLUGINS as DataSourcePaneImportPlugin[],
+                  importPlugins as DataSourcePaneImportPlugin[],
                   'name',
                 )}
-                exportPlugins={mergeTwoObjectListByKey(
-                  BUILTIN_IMPORT_PLUGINS as unknown as Array<Record<string, unknown>>,
-                  exportPlugins as unknown as Array<Record<string, unknown>>,
+                exportPlugins={mergeTwoObjectListByKey<DataSourcePaneImportPlugin>(
+                  BUILTIN_IMPORT_PLUGINS as DataSourcePaneImportPlugin[],
+                  exportPlugins as DataSourcePaneImportPlugin[],
                   'name',
                 )}
                 dataSourceTypes={dataSourceTypes}
-                initialSchema={schema}
+                // schema 来源于 defaultSchema（InterpretDataSourceConfig[]，isInit 可为 JSExpression）
+                // 或经 correctSchema 归一化后的值，DataSourcePane 按运行时数据消费（RuntimeDataSource）。
+                // 二者仅在 isInit 的 JSExpression 分支上有类型差异，此处是 interpret→runtime 的边界，做一次显式收窄。
+                initialSchema={schema as unknown as RuntimeDataSource | undefined}
                 onSchemaChange={this.handleSchemaChange}
               />
             </ErrorBoundary>
@@ -202,14 +211,11 @@ export default class DataSourcePanePlugin extends PureComponent<
   }
 }
 
-interface ErrorFallbackProps {
-  error: Error;
-  resetErrorBoundary: () => void;
-}
-function ErrorFallback(props: ErrorFallbackProps) {
+// react-error-boundary v6 的 FallbackProps：error 为 unknown，resetErrorBoundary 可带任意参数
+function ErrorFallback(props: { error: unknown; resetErrorBoundary: (...args: unknown[]) => void }) {
   return (
     <Message type="error" shape="addon" title="渲染异常">
-      {props.error.message}
+      {props.error instanceof Error ? props.error.message : String(props.error)}
       <Button onClick={props.resetErrorBoundary}>刷新面板</Button>
     </Message>
   );

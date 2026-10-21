@@ -1,5 +1,5 @@
 import React from 'react';
-import Editor from '@/MultipleFileEditor';
+import Editor from './MultipleFileEditor';
 import { EditorProvider } from './Context';
 
 const App = () => {

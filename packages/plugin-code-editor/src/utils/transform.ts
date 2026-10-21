@@ -1,13 +1,14 @@
+import type { InputOptions } from '@babel/core';
 import { transform } from './babel';
 import { TransformResult } from '../types';
 
-export const transformJS = (code, config): TransformResult => {
+export const transformJS = (code: string, config: InputOptions): TransformResult => {
   let hasError = false;
   let errorInfo = '';
   let transformCode = '';
   let errorLocation = undefined;
   try {
-    transformCode = transform(code, config).code;
+    transformCode = transform(code, config)?.code ?? '';
   } catch (ex: any) {
     hasError = true;
     errorInfo = ex.message?.split('\n')?.[0] ?? '代码解析异常';

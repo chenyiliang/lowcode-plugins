@@ -1,5 +1,7 @@
 import React from 'react';
 import { NumberPicker, Icon } from '@alifd/next';
+import type { NumberPickerProps } from '@alifd/next/types/number-picker/types';
+import type { InputProps } from '@alifd/next/types/input/types';
 import { IPublicModelPluginContext } from '@alilc/lowcode-types';
 
 import './index.scss';
@@ -14,19 +16,43 @@ const CustomIcon = Icon.createFromIconfontCN({
   scriptUrl: 'https://at.alicdn.com/t/font_2896595_33xhsbg9ux5.js',
 });
 
+/**
+ * NumberPicker 的类型声明没有列出 `addonTextAfter` / `onPressEnter`，
+ * 但其运行时实现会把未声明的 props 透传给内部的 Input，而 Input 明确支持这两个属性，
+ * 因此这里按真实的 Input 类型补全，而不是退化成 any。
+ */
+type SimulatorNumberPickerProps = NumberPickerProps &
+  Pick<InputProps, 'addonTextAfter' | 'onPressEnter' | 'placeholder'>;
+
+const TypedNumberPicker = NumberPicker as React.ComponentType<SimulatorNumberPickerProps>;
+
+/** NumberPicker 的 onChange/onPressEnter 可能给出 number | string | undefined，统一归一化为 number | null */
+function toWidth(value: number | string | undefined | null): number | null {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  const n = Number(value);
+  return Number.isNaN(n) ? null : n;
+}
+
+interface SimulatorResizePaneState {
+  active: string;
+  currentWidth: number | null;
+}
+
 export class SimulatorResizePane extends React.Component<{
   pluginContext: IPublicModelPluginContext
-}> {
+}, SimulatorResizePaneState> {
   static displayName = 'SimulatorResizePane';
 
-  state = {
+  state: SimulatorResizePaneState = {
     active: 'default',
     currentWidth: null
   };
 
   componentDidMount() {
     const { project } = this.props.pluginContext;
-    // @ts-ignore
+    // @ts-ignore 兼容旧版本引擎（onRendererReady）
     const onSimulatorRendererReady = (project.onSimulatorRendererReady || project.onRendererReady).bind(project);
     onSimulatorRendererReady(() => {
       const currentWidth = document.querySelector('.lc-simulator-canvas')?.clientWidth || this.state.currentWidth || 0;
@@ -48,8 +74,9 @@ export class SimulatorResizePane extends React.Component<{
     const simulator = project.simulatorHost;
     // 切换画布
     simulator?.set('device', device);
-    if (document.querySelector('.lc-simulator-canvas')?.style) {
-      document.querySelector('.lc-simulator-canvas').style.width = null;
+    const canvas = document.querySelector<HTMLElement>('.lc-simulator-canvas');
+    if (canvas?.style) {
+      canvas.style.width = '';
     }
     setTimeout(() => {
       const currentWidth = document.querySelector('.lc-simulator-canvas')?.clientWidth || this.state.currentWidth || 0;
@@ -92,18 +119,18 @@ export class SimulatorResizePane extends React.Component<{
           })
         }
         <div className="lp-simulator-width-setter">
-          <NumberPicker
+          <TypedNumberPicker
             className="lp-simulator-width-input"
             addonTextAfter="px"
             value={currentWidth}
             placeholder="请输入"
             onChange={(value) => {
               this.setState({
-                currentWidth: value
+                currentWidth: toWidth(value)
               });
             }}
-            onPressEnter={(event: any) => {
-              const value = event?.target?.value;
+            onPressEnter={(event) => {
+              const value = toWidth((event.target as HTMLInputElement).value);
               const simulator = project.simulatorHost;
               simulator?.set('deviceStyle', {
                 canvas: {

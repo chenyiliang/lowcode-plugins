@@ -1,7 +1,7 @@
-import { initCode, beautifyJs, compatGetSourceCodeMap } from 'utils';
+import { initCode, beautifyJs, compatGetSourceCodeMap } from '../utils';
 import { useEffect, useMemo, useRef } from 'react';
-import { Monaco, ObjectType } from 'types';
-import { FunctionEventParams } from 'types';
+import { Monaco, ObjectType } from '../types';
+import { FunctionEventParams } from '../types';
 import type { editor } from 'monaco-editor';
 
 function compatIndexContent(content: string) {

@@ -7,16 +7,20 @@ import { WORDS, TAB_KEY } from '../config';
 import { common } from '@alilc/lowcode-engine';
 
 import { FunctionEventParams } from '../types';
-import { Project, Event, Skeleton } from '@alilc/lowcode-shell';
+import type {
+  IPublicApiProject,
+  IPublicApiEvent,
+  IPublicApiSkeleton,
+} from '@alilc/lowcode-types';
 
-import '@alilc/lowcode-plugin-base-monaco-editor/lib/style';
+import '@alilc/lowcode-plugin-base-monaco-editor/style.css';
 import './index.less';
 import { SaveIcon } from '../components/SaveIcon';
 
 interface CodeEditorPaneProps {
-  project: Project;
-  event: Event;
-  skeleton: Skeleton;
+  project: IPublicApiProject;
+  event: IPublicApiEvent;
+  skeleton: IPublicApiSkeleton;
 }
 
 export const CodeEditorPane = memo(({ project, event, skeleton }: CodeEditorPaneProps) => {
@@ -26,7 +30,7 @@ export const CodeEditorPane = memo(({ project, event, skeleton }: CodeEditorPane
   const eventRef = useRef(event);
   const jsEditorRef = useRef<JsEditor>(null);
   const cssEditorRef = useRef<CssEditor>(null);
-  const saveSchemaRef = useRef<() => void>(); // save code to schema
+  const saveSchemaRef = useRef<(() => void) | undefined>(undefined); // save code to schema
 
   const [schema, setSchema] = useState(() => project.exportSchema(common.designerCabin.TransformStage.Save));
 
@@ -42,12 +46,18 @@ export const CodeEditorPane = memo(({ project, event, skeleton }: CodeEditorPane
     saveSchemaRef.current = () => {
       try {
         const currentSchema = lowcodeProjectRef.current?.exportSchema(common.designerCabin.TransformStage.Save);
-        const pageNode = currentSchema.componentsTree[0];
+        // 源码面板会在页面根 schema 上写入协议未声明的 originCode，这里局部扩展类型
+        const pageNode = currentSchema.componentsTree[0] as
+          | (typeof currentSchema.componentsTree[0] & { originCode?: string })
+          | undefined;
+        if (!pageNode) {
+          return;
+        }
         const { state, methods, lifeCycles, originCode = '' } = jsEditorRef.current?.getSchemaFromCode() ?? {};
         const css = cssEditorRef.current?.getBeautifiedCSS() ?? cssCode;
-        pageNode.state = state;
-        pageNode.methods = methods;
-        pageNode.lifeCycles = lifeCycles;
+        pageNode.state = state as typeof pageNode.state;
+        pageNode.methods = methods as typeof pageNode.methods;
+        pageNode.lifeCycles = lifeCycles as typeof pageNode.lifeCycles;
         pageNode.originCode = originCode;
 
         pageNode.css = css;
@@ -94,7 +104,7 @@ export const CodeEditorPane = memo(({ project, event, skeleton }: CodeEditorPane
 
   useEffect(() => {
     // load schema on open
-    skeletonRef.current?.onShowPanel((pluginName: string) => {
+    skeletonRef.current?.onShowPanel((pluginName?: string) => {
       if (pluginName === 'codeEditor') {
         const schema = lowcodeProjectRef.current?.exportSchema(common.designerCabin.TransformStage.Save);
         if (!schema) {
@@ -109,7 +119,7 @@ export const CodeEditorPane = memo(({ project, event, skeleton }: CodeEditorPane
     });
 
     // save schema when panel closed
-    skeletonRef.current?.onHidePanel((pluginName: string) => {
+    skeletonRef.current?.onHidePanel((pluginName?: string) => {
       if (pluginName === 'codeEditor') {
         saveSchemaRef.current?.();
       }

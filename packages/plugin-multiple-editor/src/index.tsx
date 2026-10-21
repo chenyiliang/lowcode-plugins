@@ -1,6 +1,6 @@
 import { project, event } from '@alilc/lowcode-engine';
 import { IPublicTypePluginConfig, IPublicModelPluginContext } from '@alilc/lowcode-types';
-import { controller as baseController } from '@alilc/lowcode-plugin-base-monaco-editor/es/controller';
+import { controller as baseController } from '@alilc/lowcode-plugin-base-monaco-editor';
 import { EditorProvider } from './Context';
 import MultipleFileEditor from './MultipleFileEditor';
 import React from 'react';

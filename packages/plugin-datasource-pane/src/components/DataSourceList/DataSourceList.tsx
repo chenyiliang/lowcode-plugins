@@ -2,7 +2,7 @@ import React, { PureComponent } from 'react';
 // import { VirtualList } from '@alifd/next';
 import { RuntimeDataSourceConfig as DataSourceConfig } from '@alilc/lowcode-datasource-types';
 import { DroppableDataSourceListItem } from '../DataSourceListItem';
-import { createStateMachine, DataSourcePaneStateContext } from '../../utils/stateMachine';
+import { getInitialSnapshot, type DataSourcePaneState } from '../../utils/stateMachine';
 import { DataSourcePaneContext } from '../../utils/panel-context';
 import { generateClassName } from '../../utils/misc';
 import { DataSourceInfoTag } from '../../types';
@@ -15,7 +15,7 @@ export interface DataSourceListProps {
 }
 
 interface DataSourceListState {
-  current: any;
+  current: DataSourcePaneState;
   dataSource: DataSourceConfig[];
   dragId?: string;
 }
@@ -57,12 +57,15 @@ export class DataSourceList extends PureComponent<
 > {
   static contextType = DataSourcePaneContext;
 
+  // React 19：使用 static contextType 的类需显式声明 context 类型，否则 this.context 为 unknown
+  declare context: React.ContextType<typeof DataSourcePaneContext>;
+
   private serviceS: any;
 
   state = {
-    current: createStateMachine().initialState,
+    current: getInitialSnapshot(),
     dataSource: [...this.props.dataSource],
-    dragId: undefined,
+    dragId: undefined as string | undefined,
   };
 
   componentDidMount() {

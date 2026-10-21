@@ -9,12 +9,15 @@ import _isUndefined from 'lodash/isUndefined';
  * @param list2 待合并的第二个对象数组
  * @param key 判断是否覆盖的对象 KEY
  * @param returns 合并后的对象数组
+ *
+ * 迁移说明：原签名把两个入参都写成 Array<Record<string, unknown>>，导致返回值丢失元素类型，
+ * 调用方拿不到 DataSourcePaneImportPlugin[]。这里改为泛型，保留真实元素类型。
  */
-export function mergeTwoObjectListByKey(
-  list1: Array<Record<string, unknown>>,
-  list2: Array<Record<string, unknown>>,
+export function mergeTwoObjectListByKey<T extends object>(
+  list1: T[],
+  list2: T[],
   key: string,
-) {
+): T[] {
   if (!_isArray(list1) && !_isArray(list2)) {
     return [];
   }
@@ -24,9 +27,11 @@ export function mergeTwoObjectListByKey(
   if (!_isArray(list2)) {
     return [...list1];
   }
-  return list2.reduce((acc, cur) => {
+  // key 用于运行时比较，元素类型 T 未必有索引签名，故取键值时经 Record 视图访问
+  const valueOf = (item: T) => (item as Record<string, unknown>)[key];
+  return list2.reduce<T[]>((acc, cur) => {
     if (!_isPlainObject(cur)) return acc;
-    const indexToReplace = _findIndex(acc, (item) => item[key] === cur[key]);
+    const indexToReplace = _findIndex(acc, (item) => valueOf(item) === valueOf(cur));
     if (indexToReplace !== -1) {
       acc[indexToReplace] = { ...cur };
       return acc;

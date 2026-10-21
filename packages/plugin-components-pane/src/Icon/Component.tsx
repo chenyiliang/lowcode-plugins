@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function SvgComponent({ className }) {
+export default function SvgComponent({ className }: { className?: string }) {
   return (
     <svg
       className={className}

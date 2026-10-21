@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import {
   controller,
   getMonaco,
@@ -113,15 +113,18 @@ async function initEditor(el: any) {
 }
 
 const LowcodeRender = () => {
-  const ref = useRef();
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     initEditor(ref.current);
   }, []);
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
-      <div style={{ width: '100%', height: '100%' }} ref={ref as any} />
+      <div style={{ width: '100%', height: '100%' }} ref={ref} />
     </div>
   );
 };
 
-ReactDOM.render(<LowcodeRender />, document.getElementById('root'));
+const rootEl = document.getElementById('root');
+if (rootEl) {
+  createRoot(rootEl).render(<LowcodeRender />);
+}

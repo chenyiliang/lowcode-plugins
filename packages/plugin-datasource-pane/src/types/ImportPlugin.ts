@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react';
 import { RuntimeDataSourceConfig as DataSourceConfig } from '@alilc/lowcode-datasource-types';
 import { DataSourceType } from './DataSourceType';
 
@@ -5,7 +6,12 @@ import { DataSourceType } from './DataSourceType';
 export interface DataSourcePaneImportPlugin {
   name: string;
   title: string;
-  component: React.ReactNode;
+  /**
+   * 迁移说明：原声明为 `React.ReactNode`，但面板是以 `<Component ... />` 方式渲染它的
+   * （见 pane/DataSourcePane.tsx），ReactNode 含 string/number 等不可作为 JSX 组件的类型，
+   * 声明与用法不符。改为 ComponentType 才是真实契约。
+   */
+  component: ComponentType<any>;
   componentProps?: DataSourcePaneImportPluginCustomProps;
 }
 
@@ -19,4 +25,4 @@ export interface DataSourcePaneImportPluginComponentProps {
   onCancel?: () => void;
 }
 
-export { DataSourceConfig };
+export type { DataSourceConfig };

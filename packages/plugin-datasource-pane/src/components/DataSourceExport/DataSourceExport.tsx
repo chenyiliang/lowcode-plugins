@@ -7,7 +7,7 @@ import React, { PureComponent } from 'react';
 import { Button, Message } from '@alifd/next';
 import _isArray from 'lodash/isArray';
 import _isPlainObject from 'lodash/isPlainObject';
-import MonacoEditor from '@alilc/lowcode-plugin-base-monaco-editor';
+import MonacoEditor, { type IMonacoInstance, type IEditorInstance } from '@alilc/lowcode-plugin-base-monaco-editor';
 import type { editor } from 'monaco-editor';
 import { RuntimeDataSourceConfig as DataSourceConfig } from '@alilc/lowcode-datasource-types';
 import Ajv from 'ajv';
@@ -46,7 +46,8 @@ export class DataSourceExport extends PureComponent<DataSourceExportProps, DataS
     });
   };
 
-  private monacoRef: any;
+  // monaco 的 editor 命名空间（getModelMarkers / getModels 等静态方法所在的对象）
+  private monacoRef: IMonacoInstance['editor'] | undefined;
 
   constructor(props: DataSourceExportProps) {
     super(props);
@@ -95,16 +96,20 @@ export class DataSourceExport extends PureComponent<DataSourceExportProps, DataS
     Message.success('粘贴成功！');
   };
 
-  handleEditorChange = (newValue) => {
+  handleEditorChange = (newValue: string) => {
     if (this.monacoRef) {
-      if (!this.monacoRef.getModelMarkers().find((marker: editor.IMarker) => marker.owner === 'json')) {
+      // getModelMarkers 需要传过滤参数（无参会在运行时抛错）；传 {} 取全部标记，
+      // 再筛 owner === 'json'，保持原有的「无 json 校验错误即视为合法」逻辑
+      if (!this.monacoRef.getModelMarkers({}).find((marker: editor.IMarker) => marker.owner === 'json')) {
         this.setState({ isCodeValid: true, code: newValue });
       }
     }
   };
 
-  handleEditorDidMount = (editor: MonacoEditor, monaco: MonacoEditor) => {
-    this.monacoRef = editor?.editor;
+  // editorDidMount 的签名是 (monaco, editor)；此处保存 monaco 的 editor 命名空间
+  // （getModelMarkers / getModels 等静态方法在其上），变量名 monacoRef 即由此而来
+  handleEditorDidMount = (monaco: IMonacoInstance, _editor: IEditorInstance) => {
+    this.monacoRef = monaco?.editor;
   };
 
   handleReset = () => {
@@ -126,8 +131,10 @@ export class DataSourceExport extends PureComponent<DataSourceExportProps, DataS
           width={1000}
           height={300}
           value={code}
-          wordWrap="on"
-          lineNumbers
+          // 迁移说明：wordWrap / lineNumbers 并非 ISingleMonacoEditorProps 的顶层 prop，
+          // 组件只读取 `options`（内部透传给 monaco.editor.create），原写法这两项被静默忽略。
+          // 这里按原意放进 options，使其真正生效。
+          options={{ wordWrap: 'on', lineNumbers: 'on' }}
           language="json"
           onChange={this.handleEditorChange}
           editorDidMount={this.handleEditorDidMount}

@@ -1,6 +1,6 @@
-import FileTree from '@/components/FileTree';
-import MonacoEditor from '@/components/MonacoEditor';
-import Outline from '@/components/Outline';
+import FileTree from '../components/FileTree';
+import MonacoEditor from '../components/MonacoEditor';
+import Outline from '../components/Outline';
 import { useEditorContext } from '../Context';
 import { Dialog, Message } from '@alifd/next';
 import cls from 'classnames';
@@ -8,13 +8,13 @@ import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import './index.less';
 import { HandleChangeFn } from '../components/FileTree/TreeNode';
 import { languageMap } from '../utils/constants';
-import { parseKey, treeToMap } from 'utils/files';
+import { parseKey, treeToMap } from '../utils/files';
 import { editorController, HookKeys } from '../Controller';
 
 import { initEditorModel, useUnReactiveFn } from './util';
 import type { editor } from 'monaco-editor';
 import { Monaco } from '../types';
-import { PluginHooks } from '@/Service';
+import { PluginHooks } from '../Service';
 
 // 最大最小宽（带工具栏）
 const MINWIDTH = 246;

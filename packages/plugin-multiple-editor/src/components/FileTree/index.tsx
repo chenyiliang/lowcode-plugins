@@ -13,7 +13,7 @@ import { useEditorContext } from '../../Context';
 import fullscreenIcon from './img/fullscreen.svg';
 import fullscreenExitIcon from './img/fullscreen-exit.svg';
 import compileIcon from './img/compile.svg';
-import { PluginAction } from '@/Service';
+import { PluginAction } from '../../Service';
 
 export interface FileTreeProps {
   dir?: Dir;

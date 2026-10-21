@@ -31,8 +31,11 @@ export class LowcodeExpressionComp extends PureComponent<LowcodeExpressionProps>
       <div className={className}>
         <EditorContext.Consumer>
           {({ setters }) => {
-            const ExpressionSetter = setters?.getSetter('ExpressionSetter').component;
-            if (!ExpressionSetter) return null;
+            // getSetter(...).component 类型为 IPublicTypeCustomView = ReactElement | ComponentType，
+            // 这里作为组件渲染，用 typeof === 'function' 收窄掉 ReactElement 分支（组件必为函数/类）
+            const raw = setters?.getSetter('ExpressionSetter')?.component;
+            if (typeof raw !== 'function') return null;
+            const ExpressionSetter = raw as React.ComponentType<any>;
             return (
               <ExpressionSetter
                 className={generateClassName('lowcode-expression')}

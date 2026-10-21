@@ -12,7 +12,7 @@ const { useState, useEffect } = React;
 
 const DEFAULT_SCREENSHOT = 'https://tianshu.alicdn.com/19307bb5-2881-44ad-82d3-f92e2f44aabb.png';
 
-function checkBlockAPI() {
+function checkBlockAPI(): BlockPaneAPI {
   const apiList = config.get('apiList') || {};
   const { block: blockAPI } = apiList;
 
@@ -24,7 +24,12 @@ function checkBlockAPI() {
 }
 
 export interface Block {
-
+  id: string;
+  title: string;
+  /** 区块截图，缺省时回落到 DEFAULT_SCREENSHOT */
+  screenshot?: string;
+  /** 序列化后的区块 schema，store 会 JSON.parse 后缓存 */
+  schema: string;
 }
 
 export interface BlockResponse {
@@ -33,16 +38,16 @@ export interface BlockResponse {
 }
 
 export interface BlockPaneAPI {
-  listBlocks: () => BlockResponse;
+  listBlocks: () => Promise<Block[]> | Block[];
 }
 
 export interface BlockPaneProps {
-  api: BlockPaneAPI
+  api?: BlockPaneAPI
 }
 
 export const BlockPane = (props: BlockPaneProps) => {
   const { listBlocks } = checkBlockAPI();
-  const [ blocks, setBlocks ] = useState();
+  const [ blocks, setBlocks ] = useState<Block[] | undefined>(undefined);
   useEffect(() => {
     const fetchBlocks = async () => {
       const res = await listBlocks();
@@ -62,16 +67,19 @@ export const BlockPane = (props: BlockPaneProps) => {
       return;
     }
 
-    function getSnippetId(elem: any) {
+    function getSnippetId(target: EventTarget | null): string | null {
+      let elem = target as HTMLElement | null;
       if (!elem) {
         return null;
       }
       while (shell !== elem) {
-        console.log('elem.classList; ', elem.classList);
         if (elem.classList.contains('snippet')) {
-          return elem.dataset.id;
+          return elem.dataset.id ?? null;
         }
-        elem = elem.parentNode;
+        elem = elem.parentNode as HTMLElement | null;
+        if (!elem) {
+          return null;
+        }
       }
       return null;
     }
@@ -115,7 +123,7 @@ export const BlockPane = (props: BlockPaneProps) => {
 
   return <div className='block-pane' ref={registerAdditive}><Box direction='row' wrap>
       {
-        blocks.map(item => <BlockCard id={item.id} title={item.title} screenshot={item.screenshot || DEFAULT_SCREENSHOT} />)
+        blocks.map((item: Block) => <BlockCard key={item.id} id={item.id} title={item.title} screenshot={item.screenshot || DEFAULT_SCREENSHOT} />)
       }
     </Box>
     </div>;

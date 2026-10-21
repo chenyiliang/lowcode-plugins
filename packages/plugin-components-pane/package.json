@@ -2,62 +2,60 @@
   "name": "@alilc/lowcode-plugin-components-pane",
   "version": "2.0.4",
   "description": "低代码组件面板",
-  "files": [
-    "es/",
-    "lib/"
-  ],
-  "main": "lib/index.js",
-  "module": "es/index.js",
-  "stylePath": "style.js",
-  "scripts": {
-    "start": "build-scripts start",
-    "build": "build-scripts build --skip-demo",
-    "f2elint-scan": "f2elint scan",
-    "f2elint-fix": "f2elint fix",
-    "prepublishOnly": "npm run build"
-  },
   "keywords": [
     "lowcode",
     "plugin",
     "components"
   ],
-  "authors": [
-    {
-      "name": "gray.wjf"
-    },
-    {
-      "name": "金禅"
-    }
-  ],
   "license": "ISC",
-  "devDependencies": {
-    "@alib/build-scripts": "^0.1.32",
-    "@alifd/next": "^1.23.12",
-    "@svgr/webpack": "^5.5.0",
-    "@types/react": "^16.9.13",
-    "@types/react-dom": "^16.9.4",
-    "@typescript-eslint/parser": "^4.28.3",
-    "build-plugin-component": "^1.12.0",
-    "build-plugin-fusion": "^0.1.0",
-    "build-plugin-moment-locales": "^0.1.0",
-    "eventemitter3": "^4.0.7",
-    "f2elint": "^1.2.0",
-    "html-webpack-plugin": "^5.3.2",
-    "moment": "^2.29.1",
-    "@alilc/build-plugin-alt": "^1.0.0",
-    "react-dom": "^16.0.0"
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./style.css": "./dist/lowcode-plugin-components-pane.css",
+    "./package.json": "./package.json"
   },
-  "husky": {
-    "hooks": {
-      "pre-commit": "f2elint commit-file-scan",
-      "commit-msg": "f2elint commit-msg-scan"
-    }
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite build --watch",
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
+    "build": "pnpm run clean && vite build",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@alilc/lowcode-types": "^1.0.0",
-    "classnames": "^2.3.1",
-    "lodash.debounce": "^4.0.8",
-    "react": "^16.0.0"
+    "@alifd/next": "^1.27.34",
+    "@alilc/lowcode-types": "workspace:*",
+    "classnames": "^2.5.1",
+    "lodash.debounce": "^4.0.8"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/lodash.debounce": "^4.0.9",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sass": "^1.105.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vite-plugin-dts": "^5.1.2"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "repository": {
     "type": "git",

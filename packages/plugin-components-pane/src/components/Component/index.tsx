@@ -1,23 +1,28 @@
 import React from 'react';
+import classNames from 'classnames';
 import cls from 'classnames/bind';
 import Svg from '../../Icon/Component';
 import style from './index.module.scss';
-import { Text, StandardComponentMeta } from '../../utils/transform';
+import { Text, StandardComponentMeta, SnippetMeta } from '../../utils/transform';
 
 const cx = cls.bind(style);
 
 interface Props {
-  data: StandardComponentMeta;
-  t: (input: Text) => string;
+  /**
+   * 卡片实际只消费 title / icon / snippets 三个字段（见 renderIcon 与 render），
+   * 调用方传的也是这个子集，故这里用精确的 Pick 而非整个 StandardComponentMeta。
+   */
+  data: Pick<StandardComponentMeta, 'title' | 'icon' | 'snippets'>;
+  t: (input?: Text) => string;
 }
 
 interface State {
   icon: string | React.ReactNode;
-  snippet: any;
+  snippet: SnippetMeta | undefined;
 }
 
 export default class Component extends React.Component<Props, State> {
-  static getDerivedStateFromProps(props) {
+  static getDerivedStateFromProps(props: Props): State {
     const { data } = props;
     const { icon, snippets = [] } = data;
     const snippet = snippets[0];
@@ -29,14 +34,14 @@ export default class Component extends React.Component<Props, State> {
     };
   }
 
-  state = {
+  state: State = {
     icon: '',
-    snippet: null,
+    snippet: undefined,
   };
 
-  t: (s) => string;
+  t: (s: Text) => string;
 
-  constructor(props) {
+  constructor(props: Props) {
     super(props);
     this.t = props.t;
   }
@@ -66,7 +71,9 @@ export default class Component extends React.Component<Props, State> {
     const { snippet } = this.state;
 
     return (
-      <div className={cls('snippet', cx('card'))} data-id={snippet.id} title={this.t(title)}>
+      // 'snippet' 是拖拽注册逻辑（classList.contains('snippet')）依赖的全局类名，
+      // 必须保持未哈希，故用未绑定的 classNames；cx('card') 才走 CSS Module 映射。
+      <div className={classNames('snippet', cx('card'))} data-id={snippet?.id} title={this.t(title)}>
         <div className={cx('icon')}>{this.renderIcon()}</div>
         <div className={cx('name')}>{this.t(title)}</div>
       </div>

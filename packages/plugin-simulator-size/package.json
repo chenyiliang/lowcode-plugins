@@ -2,38 +2,61 @@
   "name": "@alilc/lowcode-plugin-simulator-select",
   "version": "1.0.4",
   "description": "画布切换",
-  "main": "lib/index.js",
-  "scripts": {
-    "start": "build-scripts start --config build.js",
-    "build": "build-scripts build --skip-demo --config build.js",
-    "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "author": "mark.ck",
   "keywords": [
     "lowcode",
     "simulator"
   ],
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./style.css": "./dist/lowcode-plugin-simulator-select.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite build --watch",
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
+    "build": "pnpm run clean && vite build",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
+  },
   "dependencies": {
-    "@alifd/next": "^1.25.0"
+    "@alifd/next": "^1.27.34",
+    "@alilc/lowcode-types": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@alib/build-scripts": "^0.1.18",
-    "@alilc/build-plugin-alt": "^1.2.2",
-    "@alilc/lowcode-engine": "^1.0.0",
-    "@types/react": "^16.8.1",
-    "build-plugin-component": "^1.1.0",
-    "react": "^16.8.1",
-    "react-dom": "^16.8.1"
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sass": "^1.105.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vite-plugin-dts": "^5.1.2"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
-  "author": "mark.ck",
   "repository": {
     "type": "git",
     "url": "https://github.com/alibaba/lowcode-plugins.git",
     "directory": "packages/plugin-simulator-size"
-  },
-  "license": "MIT"
+  }
 }

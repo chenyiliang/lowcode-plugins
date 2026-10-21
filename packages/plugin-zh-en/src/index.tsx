@@ -16,7 +16,7 @@ class ZhEn extends PureComponent<PluginProps> {
     locale: globalLocale.getLocale(),
   };
 
-  private dispose = globalLocale.onChangeLocale((locale) => {
+  private dispose = globalLocale.onChangeLocale((locale: string) => {
     this.setState({
       locale,
     });

@@ -1,4 +1,6 @@
-export const defaultBabelConfig = {
+import type { InputOptions } from '@babel/core';
+
+export const defaultBabelConfig: InputOptions = {
   presets: [
     [
       "env",

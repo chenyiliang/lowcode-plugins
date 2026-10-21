@@ -1,13 +1,18 @@
 import { js_beautify, css_beautify } from 'js-beautify';
-import { isJSExpression, ProjectSchema, RootSchema } from '@alilc/lowcode-types';
-import { Dialog } from '@alifd/next';
+import { isJSExpression, IPublicTypeProjectSchema as ProjectSchema, IPublicTypeRootSchema as RootSchema } from '@alilc/lowcode-types';
 import { IState } from '../types';
 import { WORDS } from '../config';
 import type { Method } from '../types/methods';
 
 const js_beautify_config = { indent_size: 2, indent_empty_lines: true, e4x: true };
 
-const initCode = (componentSchema: RootSchema | undefined) => {
+/**
+ * 本插件在页面根 schema 上额外写入 `originCode`（源码面板编辑后的原始代码），
+ * 该字段不在 lowcode 标准协议类型里，故这里显式扩展，而不是把整棵 schema 放宽成 any。
+ */
+type CodeRootSchema = RootSchema & { originCode?: string };
+
+const initCode = (componentSchema: CodeRootSchema | undefined) => {
   const code = `class Page extends Component {
     ${initStateCode(componentSchema)}
     ${initLifeCycleCode(componentSchema)}
@@ -18,7 +23,7 @@ const initCode = (componentSchema: RootSchema | undefined) => {
 };
 
 export const schema2JsCode = (schema: ProjectSchema) => {
-  const componentSchema = schema.componentsTree[0];
+  const componentSchema = schema.componentsTree[0] as CodeRootSchema | undefined;
   const code = componentSchema?.originCode ?? initCode(componentSchema);
 
   // console.log('当前的code：', code);
@@ -33,7 +38,7 @@ export const beautifyCSS = (input?: string): string => {
   return input ? css_beautify(input, { indent_size: 2 }) : '';
 }
 
-function initStateCode(componentSchema: RootSchema | undefined) {
+function initStateCode(componentSchema: CodeRootSchema | undefined) {
   if (componentSchema?.state) {
     let statesStr = 'state = {\n';
     Object.keys(componentSchema.state).forEach((key) => {
@@ -50,10 +55,10 @@ function initStateCode(componentSchema: RootSchema | undefined) {
 
 }
 
-function initLifeCycleCode(componentSchema: RootSchema | undefined) {
+function initLifeCycleCode(componentSchema: CodeRootSchema | undefined) {
   if (componentSchema?.lifeCycles) {
     const { lifeCycles } = componentSchema;
-    const codeList = [];
+    const codeList: Array<string | undefined> = [];
 
     for (const key in lifeCycles) {
       codeList.push(createFunctionCode(key, lifeCycles[key]));
@@ -65,10 +70,10 @@ function initLifeCycleCode(componentSchema: RootSchema | undefined) {
   }
 }
 
-function initMethodsCode(componentSchema: RootSchema | undefined) {
+function initMethodsCode(componentSchema: CodeRootSchema | undefined) {
   if (componentSchema?.methods && Object.keys(componentSchema.methods).length) {
     const { methods } = componentSchema;
-    const codeList = [];
+    const codeList: Array<string | undefined> = [];
 
     for (const key in methods) {
       codeList.push(createFunctionCode(key, methods[key]));
@@ -90,10 +95,10 @@ function initMethodsCode(componentSchema: RootSchema | undefined) {
   }
 }
 
-function createFunctionCode(functionName: string, functionNode: Method) {
+function createFunctionCode(functionName: string, functionNode: Method): string | undefined {
   if (functionNode?.type === 'JSExpression' || functionNode?.type === 'JSFunction') {
     // 读取原始代码
-    let functionCode = functionNode.source;
+    let functionCode = (functionNode as Method & { source?: string }).source;
     if (functionCode) {
       functionCode = functionCode.replace(/function/, '');
     } else {
